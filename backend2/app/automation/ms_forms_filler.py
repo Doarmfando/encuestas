@@ -5,6 +5,8 @@ Usa FillingStrategies compartidas + selectores específicos de MS Forms.
 import time
 
 from app.automation.filling_strategies import FillingStrategies
+from app.automation.navigation.waits import capture_page_state, wait_for_form_ready, wait_for_post_action, wait_for_submission_signal
+from app.automation.timing import pause_action
 from app.constants.question_types import TIPOS_NO_LLENABLES
 
 # Selectores específicos de MS Forms
@@ -33,15 +35,11 @@ fs = FillingStrategies()
 class MSFormsFiller:
     """Llena formularios de Microsoft Forms usando selectores nativos."""
 
-    def fill_page(self, page, respuestas: list):
+    def fill_page(self, page, respuestas: list, runtime_config: dict | None = None):
         """Llena todas las respuestas de una página de MS Forms."""
-        try:
-            page.wait_for_selector('#question-list', timeout=10000)
-        except Exception:
+        if not wait_for_form_ready(page, page.url, runtime_config):
             print("    [MS] No se encontró #question-list")
             return
-
-        time.sleep(1)
 
         for resp_idx, resp in enumerate(respuestas):
             tipo = resp["tipo"]
@@ -53,27 +51,28 @@ class MSFormsFiller:
                 print(f"    [MS] No encontré: {pregunta[:50]}")
                 continue
 
-            filled = self._fill_element(container, page, tipo, valor, pregunta)
+            filled = self._fill_element(container, page, tipo, valor, pregunta, runtime_config=runtime_config)
 
             if filled:
                 print(f"    OK: {pregunta[:50]}")
             else:
                 print(f"    FALLÓ: {pregunta[:50]}")
 
-            time.sleep(0.4)
+            pause_action(runtime_config)
 
-    def click_submit(self, page) -> bool:
+    def click_submit(self, page, url: str = "", runtime_config: dict | None = None) -> bool:
         """Click en botón Enviar/Submit de MS Forms."""
-        return self._click_submit_button(page)
+        return self._click_submit_button(page, url=url, runtime_config=runtime_config)
 
-    def click_next(self, page) -> bool:
+    def click_next(self, page, url: str = "", runtime_config: dict | None = None) -> bool:
         """Click en botón Siguiente/Next de MS Forms."""
+        before_state = capture_page_state(page, url)
         for sel in ['button:has-text("Siguiente")', 'button:has-text("Next")', 'button[data-automation-id="nextButton"]']:
             try:
                 btn = page.locator(sel).first
                 if btn.is_visible(timeout=2000):
                     btn.click()
-                    time.sleep(1.5)
+                    wait_for_post_action(page, before_state, url, runtime_config, after_submit=False)
                     return True
             except Exception:
                 continue
@@ -115,7 +114,15 @@ class MSFormsFiller:
 
     # ========== ROUTER DE TIPOS ==========
 
-    def _fill_element(self, container, page, tipo: str, valor, pregunta: str) -> bool:
+    def _fill_element(
+        self,
+        container,
+        page,
+        tipo: str,
+        valor,
+        pregunta: str,
+        runtime_config: dict | None = None,
+    ) -> bool:
         """Redirige al método correcto según el tipo de pregunta."""
         try:
             if tipo in TIPOS_NO_LLENABLES:
@@ -123,47 +130,52 @@ class MSFormsFiller:
                 return True
 
             if tipo == "texto":
-                return fs.fill_text(container, valor, MS_TEXT_SELECTORS)
+                return fs.fill_text(container, valor, MS_TEXT_SELECTORS, runtime_config=runtime_config)
 
             elif tipo == "numero":
-                return fs.fill_text(container, valor, MS_NUMBER_SELECTORS)
+                return fs.fill_text(container, valor, MS_NUMBER_SELECTORS, runtime_config=runtime_config)
 
             elif tipo == "parrafo":
-                return fs.fill_textarea(container, valor, MS_TEXTAREA_SELECTORS)
+                return fs.fill_textarea(container, valor, MS_TEXTAREA_SELECTORS, runtime_config=runtime_config)
 
             elif tipo == "opcion_multiple":
-                return fs.click_option_by_text(container, page, str(valor), "radio", use_js_click=True)
+                return fs.click_option_by_text(
+                    container, page, str(valor), "radio", use_js_click=True, runtime_config=runtime_config
+                )
 
             elif tipo == "seleccion_multiple":
-                return fs.click_multiple_options(container, page, valor, "checkbox", use_js_click=True)
+                return fs.click_multiple_options(
+                    container, page, valor, "checkbox", use_js_click=True, runtime_config=runtime_config
+                )
 
             elif tipo == "escala_lineal":
-                return self._fill_rating(container, page, str(valor))
+                return self._fill_rating(container, page, str(valor), runtime_config=runtime_config)
 
             elif tipo in ("likert", "matriz", "matriz_checkbox"):
                 return fs.fill_matrix(container, page, valor,
                                       row_selector='[class*="likert-row"], [class*="matrix-row"], '
                                                     'tr:has(input[type="radio"]), tr:has([role="radio"]), '
                                                     '[role="radiogroup"]',
-                                      use_js_click=True)
+                                      use_js_click=True,
+                                      runtime_config=runtime_config)
 
             elif tipo == "nps":
-                return self._fill_nps(container, page, str(valor))
+                return self._fill_nps(container, page, str(valor), runtime_config=runtime_config)
 
             elif tipo == "desplegable":
-                return fs.fill_dropdown(container, page, str(valor))
+                return fs.fill_dropdown(container, page, str(valor), runtime_config=runtime_config)
 
             elif tipo == "fecha":
-                return fs.fill_date(container, str(valor))
+                return fs.fill_date(container, str(valor), runtime_config=runtime_config)
 
             elif tipo == "hora":
-                return fs.fill_time(container, str(valor))
+                return fs.fill_time(container, str(valor), runtime_config=runtime_config)
 
             elif tipo == "ranking":
-                return self._fill_ranking(container, page, valor)
+                return self._fill_ranking(container, page, valor, runtime_config=runtime_config)
 
             else:
-                return fs.auto_detect_and_fill(container, page, valor, use_js_click=True)
+                return fs.auto_detect_and_fill(container, page, valor, use_js_click=True, runtime_config=runtime_config)
 
         except Exception as e:
             print(f"    [MS] Error {tipo}: {e}")
@@ -171,10 +183,12 @@ class MSFormsFiller:
 
     # ========== MS-SPECIFIC: RATING ==========
 
-    def _fill_rating(self, container, page, valor: str) -> bool:
+    def _fill_rating(self, container, page, valor: str, runtime_config: dict | None = None) -> bool:
         """Llena escala de calificación (estrellas, números)."""
         # Intentar como radio con JS click (MS Forms necesita esto)
-        if fs.click_option_by_text(container, page, valor, "radio", use_js_click=True):
+        if fs.click_option_by_text(
+            container, page, valor, "radio", use_js_click=True, runtime_config=runtime_config
+        ):
             return True
 
         # Botones de rating específicos de MS Forms
@@ -189,7 +203,7 @@ class MSFormsFiller:
             if 0 <= idx < count:
                 try:
                     rating_buttons.nth(idx).click()
-                    time.sleep(0.3)
+                    pause_action(runtime_config, multiplier=0.8)
                     return True
                 except Exception:
                     pass
@@ -198,9 +212,11 @@ class MSFormsFiller:
 
     # ========== MS-SPECIFIC: NPS ==========
 
-    def _fill_nps(self, container, page, valor: str) -> bool:
+    def _fill_nps(self, container, page, valor: str, runtime_config: dict | None = None) -> bool:
         """Llena NPS (0-10)."""
-        if fs.click_option_by_text(container, page, valor, "radio", use_js_click=True):
+        if fs.click_option_by_text(
+            container, page, valor, "radio", use_js_click=True, runtime_config=runtime_config
+        ):
             return True
 
         nps_buttons = container.locator(
@@ -212,28 +228,30 @@ class MSFormsFiller:
                 idx = int(valor)
                 if 0 <= idx <= 10 and idx < nps_buttons.count():
                     nps_buttons.nth(idx).click()
-                    time.sleep(0.3)
+                    pause_action(runtime_config, multiplier=0.8)
                     return True
             except (ValueError, Exception):
                 pass
 
-        return self._fill_rating(container, page, valor)
+        return self._fill_rating(container, page, valor, runtime_config=runtime_config)
 
     # ========== MS-SPECIFIC: RANKING ==========
 
-    def _fill_ranking(self, container, page, valor) -> bool:
+    def _fill_ranking(self, container, page, valor, runtime_config: dict | None = None) -> bool:
         """Ranking con botones up/down o drag&drop."""
         if isinstance(valor, str):
-            return fs.click_option_by_text(container, page, valor, "radio", use_js_click=True)
+            return fs.click_option_by_text(
+                container, page, valor, "radio", use_js_click=True, runtime_config=runtime_config
+            )
 
         if isinstance(valor, list):
-            return fs.fill_ranking(container, page, valor)
+            return fs.fill_ranking(container, page, valor, runtime_config=runtime_config)
 
         return False
 
     # ========== MS-SPECIFIC: SUBMIT ==========
 
-    def _click_submit_button(self, page) -> bool:
+    def _click_submit_button(self, page, url: str = "", runtime_config: dict | None = None) -> bool:
         """Click en botón Enviar de MS Forms y verificar envío real."""
         # Selectores ordenados de más específico a más genérico
         submit_selectors = [
@@ -246,13 +264,14 @@ class MSFormsFiller:
         ]
 
         clicked = False
+        before_state = capture_page_state(page, url)
         for sel in submit_selectors:
             try:
                 btn = page.locator(sel).first
                 if btn.is_visible(timeout=1500):
                     # Scroll al botón para asegurar visibilidad
                     btn.scroll_into_view_if_needed()
-                    time.sleep(0.3)
+                    pause_action(runtime_config, multiplier=0.8)
                     btn.click()
                     print(f"    Botón 'Enviar' clickeado ({sel[:40]})")
                     clicked = True
@@ -285,45 +304,10 @@ class MSFormsFiller:
             print("    No se encontró botón de enviar")
             return False
 
-        # Esperar a que MS Forms procese el envío
-        return self._wait_for_submission(page)
-
-    def _wait_for_submission(self, page) -> bool:
-        """Espera y verifica que MS Forms realmente procesó el envío."""
-        # Esperar hasta 15 segundos por la confirmación real
-        for _ in range(15):
-            time.sleep(1)
-            try:
-                contenido = page.content().lower()
-
-                # Textos de confirmación reales de MS Forms
-                confirmation_texts = [
-                    "your response was submitted",
-                    "thanks!",
-                    "thank you",
-                    "gracias",
-                    "tu respuesta se envió",
-                    "se envió tu respuesta",
-                    "your response has been submitted",
-                    "response was submitted",
-                ]
-                for texto in confirmation_texts:
-                    if texto in contenido:
-                        print("    Confirmación de envío detectada")
-                        return True
-
-                # Detectar página de confirmación de MS Forms (class típica)
-                confirmation_page = page.locator(
-                    '[class*="thank"], [class*="confirmation"], '
-                    '[data-automation-id="thankYouMessage"], '
-                    '[class*="post-submit"]'
-                )
-                if confirmation_page.count() > 0:
-                    print("    Página de confirmación detectada")
-                    return True
-
-            except Exception:
-                continue
-
-        print("    No se confirmó el envío después de 15s")
-        return False
+        wait_for_post_action(page, before_state, url, runtime_config, after_submit=True)
+        enviado = wait_for_submission_signal(page, url, runtime_config, submit_clicked=True)
+        if enviado:
+            print("    Confirmación de envío detectada")
+        else:
+            print("    No se confirmó el envío dentro de la ventana rápida")
+        return enviado

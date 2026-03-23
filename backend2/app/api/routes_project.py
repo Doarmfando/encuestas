@@ -6,6 +6,7 @@ import os
 import threading
 from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request, send_file, current_app
+from app.automation.timing import DEFAULT_EXECUTION_PROFILE, resolve_execution_profile
 from app.database.connection import db
 from app.database.models import Project, ProjectConfig, Execution
 
@@ -350,16 +351,21 @@ def ejecutar_proyecto(project_id):
 
     data = request.json or {}
     cantidad = data.get("cantidad", 10)
-    headless = data.get("headless", False)
+    headless = data.get("headless", True)
+    speed_profile = data.get("speed_profile", DEFAULT_EXECUTION_PROFILE)
 
     if cantidad < 1 or cantidad > 500:
         return jsonify({"error": "Cantidad debe ser entre 1 y 500"}), 400
+    try:
+        speed_profile = resolve_execution_profile(speed_profile)["id"]
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 
     execution = Execution(
         project_id=project.id,
         config_id=config.id,
         status="ejecutando",
-        mensaje=f"Iniciando {cantidad} encuestas...",
+        mensaje=f"Iniciando {cantidad} encuestas ({speed_profile})...",
         total=cantidad,
         headless=headless,
         started_at=datetime.now(timezone.utc),
@@ -372,12 +378,24 @@ def ejecutar_proyecto(project_id):
 
     hilo = threading.Thread(
         target=execution_service.execute,
-        args=(app, execution.id, project.url, config.to_configuracion(), project.to_estructura(), cantidad, headless),
+        args=(
+            app,
+            execution.id,
+            project.url,
+            config.to_configuracion(),
+            project.to_estructura(),
+            cantidad,
+            headless,
+            speed_profile,
+        ),
     )
     hilo.daemon = True
     hilo.start()
 
-    return jsonify({"mensaje": f"Bot iniciado: {cantidad} encuestas", "execution_id": execution.id})
+    return jsonify({
+        "mensaje": f"Bot iniciado: {cantidad} encuestas ({speed_profile})",
+        "execution_id": execution.id,
+    })
 
 
 @project_bp.route("/projects/<int:project_id>/estado", methods=["GET"])

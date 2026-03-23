@@ -8,8 +8,9 @@ Uso:
     fs.fill_text(container, "valor", selectors=["input[type='text']", "textarea"])
     fs.click_option(container, page, "opcion", role="radio")
 """
-import time
 import random
+
+from app.automation.timing import pause_action
 
 
 class FillingStrategies:
@@ -18,7 +19,7 @@ class FillingStrategies:
     # ========== TEXTO ==========
 
     @staticmethod
-    def fill_text(container, valor: str, selectors: list[str] | None = None) -> bool:
+    def fill_text(container, valor: str, selectors: list[str] | None = None, runtime_config: dict | None = None) -> bool:
         """Llena un campo de texto en cualquier contenedor.
 
         Args:
@@ -37,7 +38,7 @@ class FillingStrategies:
                 el = container.locator(sel).first
                 if el.is_visible(timeout=1500):
                     el.click()
-                    time.sleep(0.2)
+                    pause_action(runtime_config, multiplier=0.8)
                     el.fill("")
                     el.fill(str(valor))
                     # Disparar eventos que frameworks React/Fluent necesitan
@@ -49,7 +50,7 @@ class FillingStrategies:
         return False
 
     @staticmethod
-    def fill_textarea(container, valor: str, selectors: list[str] | None = None) -> bool:
+    def fill_textarea(container, valor: str, selectors: list[str] | None = None, runtime_config: dict | None = None) -> bool:
         """Llena un campo de texto largo (textarea, contenteditable)."""
         if selectors is None:
             selectors = [
@@ -61,7 +62,7 @@ class FillingStrategies:
                 el = container.locator(sel).first
                 if el.is_visible(timeout=1500):
                     el.click()
-                    time.sleep(0.2)
+                    pause_action(runtime_config, multiplier=0.8)
                     el.fill("")
                     el.fill(str(valor))
                     el.dispatch_event("input")
@@ -70,13 +71,13 @@ class FillingStrategies:
             except Exception:
                 continue
         # Fallback a input de texto
-        return FillingStrategies.fill_text(container, valor)
+        return FillingStrategies.fill_text(container, valor, runtime_config=runtime_config)
 
     # ========== CLICK EN OPCIÓN (radio / checkbox) ==========
 
     @staticmethod
     def click_option_by_text(container, page, valor: str, role: str = "radio",
-                             use_js_click: bool = False) -> bool:
+                             use_js_click: bool = False, runtime_config: dict | None = None) -> bool:
         """Hace click en un radio o checkbox buscando por texto de la opción.
 
         Args:
@@ -99,36 +100,38 @@ class FillingStrategies:
         # Estrategia 1: match exacto
         for idx, text in enumerate(option_texts):
             if text.lower().strip() == valor.lower().strip():
-                return FillingStrategies._click_at_index(inputs, page, idx, use_js_click)
+                return FillingStrategies._click_at_index(inputs, page, idx, use_js_click, runtime_config=runtime_config)
 
         # Estrategia 2: match parcial
         for idx, text in enumerate(option_texts):
             if valor.lower().strip() in text.lower().strip() or text.lower().strip() in valor.lower().strip():
-                return FillingStrategies._click_at_index(inputs, page, idx, use_js_click)
+                return FillingStrategies._click_at_index(inputs, page, idx, use_js_click, runtime_config=runtime_config)
 
         # Estrategia 3: valor numérico como índice 1-based
         if valor.strip().isdigit():
             idx = int(valor.strip()) - 1
             if 0 <= idx < count:
-                return FillingStrategies._click_at_index(inputs, page, idx, use_js_click)
+                return FillingStrategies._click_at_index(inputs, page, idx, use_js_click, runtime_config=runtime_config)
 
         return False
 
     @staticmethod
     def click_multiple_options(container, page, valores: list, role: str = "checkbox",
-                               use_js_click: bool = False) -> bool:
+                               use_js_click: bool = False, runtime_config: dict | None = None) -> bool:
         """Hace click en múltiples checkboxes."""
         if isinstance(valores, str):
             valores = [valores]
         any_filled = False
         for val in valores:
-            if FillingStrategies.click_option_by_text(container, page, val, role, use_js_click):
+            if FillingStrategies.click_option_by_text(
+                container, page, val, role, use_js_click, runtime_config=runtime_config
+            ):
                 any_filled = True
-                time.sleep(0.2)
+                pause_action(runtime_config, multiplier=0.7)
         return any_filled
 
     @staticmethod
-    def _click_at_index(inputs, page, idx: int, use_js_click: bool = False) -> bool:
+    def _click_at_index(inputs, page, idx: int, use_js_click: bool = False, runtime_config: dict | None = None) -> bool:
         """Click en un input por índice con eventos completos."""
         try:
             el = inputs.nth(idx)
@@ -147,7 +150,7 @@ class FillingStrategies:
                 # Click normal de Playwright (scrollea, espera actionability)
                 el.scroll_into_view_if_needed()
                 el.click()
-            time.sleep(0.3)
+            pause_action(runtime_config, multiplier=0.9)
             return True
         except Exception:
             return False
@@ -207,7 +210,7 @@ class FillingStrategies:
 
     @staticmethod
     def fill_dropdown(container, page, valor: str,
-                      trigger_selectors: list[str] | None = None) -> bool:
+                      trigger_selectors: list[str] | None = None, runtime_config: dict | None = None) -> bool:
         """Selecciona una opción de dropdown (nativo o custom).
 
         Args:
@@ -236,7 +239,7 @@ class FillingStrategies:
             if triggers.count() > 0:
                 try:
                     triggers.first.click()
-                    time.sleep(0.5)
+                    pause_action(runtime_config, multiplier=1.0)
                     option = page.locator(
                         f'[role="option"]:has-text("{valor}"), '
                         f'[class*="dropdown-option"]:has-text("{valor}"), '
@@ -244,11 +247,11 @@ class FillingStrategies:
                     ).first
                     if option.is_visible(timeout=3000):
                         option.click()
-                        time.sleep(0.3)
+                        pause_action(runtime_config, multiplier=0.9)
                         return True
                     # Cerrar si no encontró
                     page.keyboard.press("Escape")
-                    time.sleep(0.2)
+                    pause_action(runtime_config, multiplier=0.7)
                 except Exception:
                     pass
 
@@ -260,11 +263,12 @@ class FillingStrategies:
     def fill_date(container, valor: str,
                   day_selectors: list[str] | None = None,
                   month_selectors: list[str] | None = None,
-                  year_selectors: list[str] | None = None) -> bool:
+                  year_selectors: list[str] | None = None,
+                  runtime_config: dict | None = None) -> bool:
         """Llena campo de fecha con inputs separados o input[type=date]."""
         partes = FillingStrategies._parse_date(valor)
         if not partes:
-            return FillingStrategies.fill_text(container, valor)
+            return FillingStrategies.fill_text(container, valor, runtime_config=runtime_config)
         dia, mes, anio = partes
 
         if day_selectors is None:
@@ -302,7 +306,7 @@ class FillingStrategies:
                 el = container.locator(sel).first
                 if el.is_visible(timeout=1000):
                     el.click()
-                    time.sleep(0.1)
+                    pause_action(runtime_config, multiplier=0.6)
                     el.fill(str(dia))
                     filled_any = True
                     break
@@ -314,7 +318,7 @@ class FillingStrategies:
                 el = container.locator(sel).first
                 if el.is_visible(timeout=1000):
                     el.click()
-                    time.sleep(0.1)
+                    pause_action(runtime_config, multiplier=0.6)
                     el.fill(str(mes))
                     filled_any = True
                     break
@@ -326,7 +330,7 @@ class FillingStrategies:
                 el = container.locator(sel).first
                 if el.is_visible(timeout=1000):
                     el.click()
-                    time.sleep(0.1)
+                    pause_action(runtime_config, multiplier=0.6)
                     el.fill(str(anio))
                     filled_any = True
                     break
@@ -357,7 +361,8 @@ class FillingStrategies:
     @staticmethod
     def fill_time(container, valor: str,
                   hour_selectors: list[str] | None = None,
-                  minute_selectors: list[str] | None = None) -> bool:
+                  minute_selectors: list[str] | None = None,
+                  runtime_config: dict | None = None) -> bool:
         """Llena campo de hora con inputs separados o input[type=time]."""
         partes = str(valor).split(":")
         hora = partes[0].strip() if len(partes) > 0 else "12"
@@ -389,7 +394,7 @@ class FillingStrategies:
                 el = container.locator(sel).first
                 if el.is_visible(timeout=1000):
                     el.click()
-                    time.sleep(0.1)
+                    pause_action(runtime_config, multiplier=0.6)
                     el.fill(hora)
                     filled_any = True
                     break
@@ -401,7 +406,7 @@ class FillingStrategies:
                 el = container.locator(sel).first
                 if el.is_visible(timeout=1000):
                     el.click()
-                    time.sleep(0.1)
+                    pause_action(runtime_config, multiplier=0.6)
                     el.fill(minuto)
                     filled_any = True
                     break
@@ -414,19 +419,19 @@ class FillingStrategies:
             if dropdowns.count() >= 2:
                 try:
                     dropdowns.nth(0).select_option(value=hora)
-                    time.sleep(0.2)
+                    pause_action(runtime_config, multiplier=0.7)
                     dropdowns.nth(1).select_option(value=minuto)
                     return True
                 except Exception:
                     pass
 
-        return filled_any or FillingStrategies.fill_text(container, valor)
+        return filled_any or FillingStrategies.fill_text(container, valor, runtime_config=runtime_config)
 
     # ========== LIKERT / MATRIX ==========
 
     @staticmethod
     def fill_matrix(container, page, valor, row_selector: str = '[role="radiogroup"]',
-                    use_js_click: bool = False) -> bool:
+                    use_js_click: bool = False, runtime_config: dict | None = None) -> bool:
         """Llena pregunta tipo matriz/likert (filas x columnas).
 
         Args:
@@ -456,8 +461,8 @@ class FillingStrategies:
                     row_text = ""
                 for fila_key, col_val in valor.items():
                     if fila_key.lower() in row_text.lower() or row_text.lower() in fila_key.lower():
-                        FillingStrategies._click_in_row(row, page, str(col_val), use_js_click)
-                        time.sleep(0.2)
+                        FillingStrategies._click_in_row(row, page, str(col_val), use_js_click, runtime_config=runtime_config)
+                        pause_action(runtime_config, multiplier=0.7)
                         break
 
         elif isinstance(valor, list):
@@ -465,20 +470,29 @@ class FillingStrategies:
                 if i < row_count:
                     if isinstance(val, list):
                         for v in val:
-                            FillingStrategies._click_in_row(rows.nth(i), page, str(v), use_js_click, role="checkbox")
+                            FillingStrategies._click_in_row(
+                                rows.nth(i), page, str(v), use_js_click, role="checkbox", runtime_config=runtime_config
+                            )
                     else:
-                        FillingStrategies._click_in_row(rows.nth(i), page, str(val), use_js_click)
-                    time.sleep(0.2)
+                        FillingStrategies._click_in_row(rows.nth(i), page, str(val), use_js_click, runtime_config=runtime_config)
+                    pause_action(runtime_config, multiplier=0.7)
         else:
             # Valor único para todas las filas
             for i in range(row_count):
-                FillingStrategies._click_in_row(rows.nth(i), page, str(valor), use_js_click)
-                time.sleep(0.2)
+                FillingStrategies._click_in_row(rows.nth(i), page, str(valor), use_js_click, runtime_config=runtime_config)
+                pause_action(runtime_config, multiplier=0.7)
 
         return True
 
     @staticmethod
-    def _click_in_row(row, page, valor: str, use_js_click: bool = False, role: str = "radio") -> bool:
+    def _click_in_row(
+        row,
+        page,
+        valor: str,
+        use_js_click: bool = False,
+        role: str = "radio",
+        runtime_config: dict | None = None,
+    ) -> bool:
         """Click en un radio/checkbox dentro de una fila de matriz."""
         inputs = row.locator(f'input[type="{role}"], [role="{role}"]')
         count = inputs.count()
@@ -497,6 +511,7 @@ class FillingStrategies:
                             page.evaluate('el => el.click()', inner.first.element_handle())
                         else:
                             inner.first.click(force=True)
+                        pause_action(runtime_config, multiplier=0.7)
                         return True
             except Exception:
                 continue
@@ -510,6 +525,7 @@ class FillingStrategies:
                         page.evaluate('el => el.click()', inputs.nth(idx).element_handle())
                     else:
                         inputs.nth(idx).click(force=True)
+                    pause_action(runtime_config, multiplier=0.7)
                     return True
                 except Exception:
                     pass
@@ -522,6 +538,7 @@ class FillingStrategies:
                     page.evaluate('el => el.click()', inputs.nth(idx).element_handle())
                 else:
                     inputs.nth(idx).click(force=True)
+                pause_action(runtime_config, multiplier=0.7)
                 return True
             except Exception:
                 pass
@@ -531,7 +548,7 @@ class FillingStrategies:
     # ========== RANKING ==========
 
     @staticmethod
-    def fill_ranking(container, page, valor: list) -> bool:
+    def fill_ranking(container, page, valor: list, runtime_config: dict | None = None) -> bool:
         """Llena ranking reordenando items con botones up/down o drag&drop."""
         ranking_items = container.locator(
             '[class*="ranking-item"], [class*="sortable-item"], '
@@ -553,7 +570,7 @@ class FillingStrategies:
                             up_btn = item.locator('button[aria-label*="up" i], button[aria-label*="arriba" i]')
                             if up_btn.count() > 0:
                                 up_btn.first.click()
-                                time.sleep(0.3)
+                                pause_action(runtime_config, multiplier=0.9)
                                 current_pos -= 1
                             else:
                                 break
@@ -598,20 +615,30 @@ class FillingStrategies:
         return None
 
     @staticmethod
-    def auto_detect_and_fill(container, page, valor, use_js_click: bool = False) -> bool:
+    def auto_detect_and_fill(
+        container,
+        page,
+        valor,
+        use_js_click: bool = False,
+        runtime_config: dict | None = None,
+    ) -> bool:
         """Detecta automáticamente el tipo de campo y lo llena."""
         valor_str = str(valor) if not isinstance(valor, list) else str(valor[0])
 
         if container.locator('input[type="radio"], [role="radio"]').count() > 0:
-            return FillingStrategies.click_option_by_text(container, page, valor_str, "radio", use_js_click)
+            return FillingStrategies.click_option_by_text(
+                container, page, valor_str, "radio", use_js_click, runtime_config=runtime_config
+            )
         if container.locator('input[type="checkbox"], [role="checkbox"]').count() > 0:
             vals = valor if isinstance(valor, list) else [valor_str]
-            return FillingStrategies.click_multiple_options(container, page, vals, "checkbox", use_js_click)
+            return FillingStrategies.click_multiple_options(
+                container, page, vals, "checkbox", use_js_click, runtime_config=runtime_config
+            )
         if container.locator('textarea').count() > 0:
-            return FillingStrategies.fill_textarea(container, valor_str)
+            return FillingStrategies.fill_textarea(container, valor_str, runtime_config=runtime_config)
         if container.locator('select, [role="combobox"]').count() > 0:
-            return FillingStrategies.fill_dropdown(container, page, valor_str)
+            return FillingStrategies.fill_dropdown(container, page, valor_str, runtime_config=runtime_config)
         if container.locator('input:not([type="hidden"])').count() > 0:
-            return FillingStrategies.fill_text(container, valor_str)
+            return FillingStrategies.fill_text(container, valor_str, runtime_config=runtime_config)
 
         return False

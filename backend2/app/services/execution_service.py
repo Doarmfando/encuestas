@@ -4,12 +4,12 @@ Servicio de ejecución del bot - Orquesta el llenado de encuestas.
 import io
 import sys
 import time
-import random
 import threading
 from datetime import datetime, timezone
 from flask import current_app
 from playwright.sync_api import sync_playwright
 
+from app.automation.timing import build_runtime_config, pause_between_surveys
 from app.database.connection import db
 from app.database.models import Execution, Response
 from app.services.generator_service import GeneratorService
@@ -73,6 +73,7 @@ class ExecutionService:
         estructura: dict,
         cantidad: int,
         headless: bool = False,
+        speed_profile: str | None = None,
     ):
         """Ejecuta el bot en un hilo separado con captura de logs."""
         stop_event = threading.Event()
@@ -87,7 +88,7 @@ class ExecutionService:
             old_stdout = sys.stdout
             sys.stdout = log_capture
             try:
-                self._run(execution_id, url, configuracion, estructura, cantidad, headless, stop_event)
+                self._run(execution_id, url, configuracion, estructura, cantidad, headless, speed_profile, stop_event)
             except Exception as e:
                 print(f"  Error fatal en ejecución: {e}")
                 self._update_execution(execution_id, status="error", mensaje=f"Error: {str(e)[:200]}")
@@ -140,6 +141,7 @@ class ExecutionService:
         estructura: dict,
         cantidad: int,
         headless: bool,
+        speed_profile: str | None,
         stop_event: threading.Event,
     ):
         """Loop principal de ejecución con reintentos y circuit breaker."""
@@ -152,17 +154,25 @@ class ExecutionService:
 
         # Configuración del browser
         browser_config = self._get_browser_config()
+        runtime_config = build_runtime_config(speed_profile, headless=headless)
+        metrics = {
+            "generation_time": 0.0,
+            "fill_time": 0.0,
+            "pause_time": 0.0,
+            "retry_count": 0,
+        }
 
         self._update_execution(
             execution_id,
             status="ejecutando",
-            mensaje=f"Iniciando {cantidad} encuestas...",
+            mensaje=f"Iniciando {cantidad} encuestas ({runtime_config['speed_profile']})...",
             total=cantidad,
         )
 
         print(f"\n Bot - {cantidad} respuestas")
         print(f"   URL: {url[:60]}...")
         print(f"   Modo: {'Invisible' if headless else 'Visible'}")
+        print(f"   Perfil velocidad: {runtime_config['speed_profile']}")
         print(f"   Inicio: {datetime.now().strftime('%H:%M:%S')}")
 
         with sync_playwright() as p:
@@ -196,12 +206,16 @@ class ExecutionService:
                     context = self._create_context(browser, browser_config)
 
                 # Generar respuesta
+                gen_inicio = time.perf_counter()
                 respuesta = self.generator.generate(configuracion, estructura)
+                metrics["generation_time"] += time.perf_counter() - gen_inicio
 
                 # Intentar llenar con reintentos
-                exito, tiempo = self._ejecutar_con_reintentos(
-                    filler, context, respuesta, url, i, browser, browser_config
+                exito, tiempo, intentos, context = self._ejecutar_con_reintentos(
+                    filler, context, respuesta, url, i, browser, browser_config, runtime_config
                 )
+                metrics["fill_time"] += tiempo
+                metrics["retry_count"] += max(0, intentos - 1)
 
                 if exito:
                     exitosas += 1
@@ -239,9 +253,9 @@ class ExecutionService:
 
                 # Pausa interruptible entre encuestas
                 if i < cantidad and not stop_event.is_set():
-                    pausa = random.uniform(browser_config["pausa_min"], browser_config["pausa_max"])
+                    pausa = pause_between_surveys(runtime_config, stop_event=stop_event)
+                    metrics["pause_time"] += pausa
                     print(f"  Pausa {pausa:.1f}s...")
-                    stop_event.wait(timeout=pausa)
 
             # Cerrar browser
             try:
@@ -254,18 +268,29 @@ class ExecutionService:
                 pass
 
         # Generar Excel y marcar completado
-        self._finalizar(execution_id, registros, exitosas, fallidas, cantidad, inicio, estructura)
+        self._finalizar(
+            execution_id,
+            registros,
+            exitosas,
+            fallidas,
+            cantidad,
+            inicio,
+            estructura,
+            runtime_config,
+            metrics,
+        )
 
     # ========== EJECUCIÓN CON REINTENTOS ==========
 
-    def _ejecutar_con_reintentos(self, filler, context, respuesta, url, numero, browser, browser_config):
+    def _ejecutar_con_reintentos(self, filler, context, respuesta, url, numero, browser, browser_config, runtime_config):
         """Ejecuta una encuesta con reintentos si falla."""
+        fill_start = time.perf_counter()
         for intento in range(1, self.MAX_REINTENTOS + 1):
             page = None
             try:
                 page = context.new_page()
-                exito, tiempo = filler.fill_form(page, respuesta, url, numero)
-                return exito, tiempo
+                exito, _ = filler.fill_form(page, respuesta, url, numero, runtime_config=runtime_config)
+                return exito, time.perf_counter() - fill_start, intento, context
 
             except Exception as e:
                 error_msg = str(e)
@@ -281,7 +306,7 @@ class ExecutionService:
                     context = self._create_context(browser, browser_config)
 
                 if intento == self.MAX_REINTENTOS:
-                    return False, 0.0
+                    return False, time.perf_counter() - fill_start, intento, context
 
             finally:
                 if page:
@@ -290,7 +315,7 @@ class ExecutionService:
                     except Exception:
                         pass
 
-        return False, 0.0
+        return False, time.perf_counter() - fill_start, self.MAX_REINTENTOS, context
 
     # ========== BROWSER ==========
 
@@ -365,11 +390,14 @@ class ExecutionService:
             print(f"  Error actualizando ejecución: {e}")
             db.session.rollback()
 
-    def _finalizar(self, execution_id, registros, exitosas, fallidas, cantidad, inicio, estructura):
+    def _finalizar(self, execution_id, registros, exitosas, fallidas, cantidad, inicio, estructura, runtime_config, metrics):
         """Genera Excel y marca la ejecución como completada."""
         tiempo_final = time.time() - inicio
         tasa = (exitosas / max(cantidad, 1) * 100)
         promedio_final = tiempo_final / max(len(registros), 1)
+        promedio_generacion = metrics["generation_time"] / max(len(registros), 1)
+        promedio_activo = metrics["fill_time"] / max(len(registros), 1)
+        promedio_pausa = metrics["pause_time"] / max(len(registros), 1)
 
         resumen = {
             "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -398,10 +426,22 @@ class ExecutionService:
         self._update_execution(
             execution_id,
             status=status,
-            mensaje=f"Completado: {exitosas}/{cantidad} en {self._formatear_tiempo(tiempo_final)}",
+            mensaje=(
+                f"Completado: {exitosas}/{cantidad} en {self._formatear_tiempo(tiempo_final)} "
+                f"({runtime_config['speed_profile']})"
+            ),
             excel_path=excel_path,
         )
 
+        print(f"\n  Perfil velocidad: {runtime_config['speed_profile']}")
+        print(f"  Generacion total: {self._formatear_tiempo(metrics['generation_time'])}")
+        print(f"  Llenado activo: {self._formatear_tiempo(metrics['fill_time'])}")
+        print(f"  Pausas intencionales: {self._formatear_tiempo(metrics['pause_time'])}")
+        print(f"  Reintentos totales: {metrics['retry_count']}")
+        print(f"  Promedio generacion: {self._formatear_tiempo(promedio_generacion)}")
+        print(f"  Promedio activo: {self._formatear_tiempo(promedio_activo)}")
+        print(f"  Promedio pausa: {self._formatear_tiempo(promedio_pausa)}")
+        print(f"  Promedio total: {self._formatear_tiempo(promedio_final)}")
         print(f"\n{'='*55}")
         print(f"  RESUMEN: {exitosas}/{cantidad} exitosas ({tasa:.0f}%)")
         print(f"  Tiempo: {self._formatear_tiempo(tiempo_final)} total")

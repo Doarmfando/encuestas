@@ -150,8 +150,16 @@
                     <label>Cantidad</label>
                     <input type="number" id="cantidadInput" value="10" min="1" max="500">
                 </div>
+                <div class="exec-field">
+                    <label>Velocidad</label>
+                    <select id="speedProfileInput">
+                        <option value="balanced" selected>Rapido balanceado</option>
+                        <option value="fast">Maxima velocidad</option>
+                        <option value="safe">Disimulado</option>
+                    </select>
+                </div>
                 <label class="checkbox-label">
-                    <input type="checkbox" id="headlessInput">
+                    <input type="checkbox" id="headlessInput" checked>
                     Modo invisible
                 </label>
                 <button class="btn btn-success" id="btnEjecutar" onclick="ejecutar()">Ejecutar</button>

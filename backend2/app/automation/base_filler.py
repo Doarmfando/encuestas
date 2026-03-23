@@ -8,6 +8,13 @@ class BaseFiller(ABC):
     """Interfaz base para llenar formularios."""
 
     @abstractmethod
-    def fill_form(self, page, respuesta_generada: dict, url: str, numero: int) -> tuple[bool, float]:
+    def fill_form(
+        self,
+        page,
+        respuesta_generada: dict,
+        url: str,
+        numero: int,
+        runtime_config: dict | None = None,
+    ) -> tuple[bool, float]:
         """Llena un formulario completo y retorna (exito, tiempo_segundos)."""
         ...

@@ -8,12 +8,17 @@ async function ejecutar() {
 
     const cantidad = parseInt(document.getElementById("cantidadInput").value);
     const headless = document.getElementById("headlessInput").checked;
+    const speedProfile = document.getElementById("speedProfileInput")?.value || "balanced";
 
     // Guardar config actual antes de ejecutar
     await guardarConfig();
 
     try {
-        const result = await apiPost(`projects/${currentProject.id}/execute`, { cantidad, headless });
+        const result = await apiPost(`projects/${currentProject.id}/execute`, {
+            cantidad,
+            headless,
+            speed_profile: speedProfile,
+        });
         currentExecutionId = result.execution_id || null;
         lastLogLength = 0;
 
@@ -106,4 +111,23 @@ function descargar() {
 function clearConsole() {
     document.getElementById("consoleOutput").textContent = "Consola limpia.\n";
     lastLogLength = 0;
+}
+
+function applyExecutionSettings(settings = {}) {
+    const headlessInput = document.getElementById("headlessInput");
+    if (headlessInput && typeof settings.default_headless === "boolean") {
+        headlessInput.checked = settings.default_headless;
+    }
+
+    const speedSelect = document.getElementById("speedProfileInput");
+    if (!speedSelect) return;
+
+    const profiles = Array.isArray(settings.execution_profiles) ? settings.execution_profiles : [];
+    if (profiles.length) {
+        speedSelect.innerHTML = profiles.map((profile) => `
+            <option value="${profile.id}">${profile.label}</option>
+        `).join("");
+    }
+
+    speedSelect.value = settings.default_execution_profile || "balanced";
 }

@@ -4,6 +4,13 @@ Deteccion de botones de navegacion con multiples estrategias.
 import time
 
 from app.automation.navigation.selectors import detectar_plataforma, GENERIC
+from app.automation.navigation.waits import (
+    capture_page_state,
+    has_success_signal,
+    wait_for_post_action,
+    wait_for_submission_signal,
+)
+from app.automation.timing import pause_action
 from app.utils.question_inference import SHORT_ANSWER_INPUT_SELECTORS, dummy_value_for_question
 
 
@@ -57,14 +64,19 @@ def _normalizar_boton(texto: str, platform: dict) -> str:
     return texto
 
 
-def click_boton(page, nombre: str, url: str = "") -> bool:
+def click_boton(page, nombre: str, url: str = "", runtime_config: dict | None = None) -> bool:
     """Hace click en un boton de navegacion con multiples estrategias."""
     platform = detectar_plataforma(url) if url else GENERIC
     textos_buscar = _expandir_nombre_boton(nombre, platform)
+    before_state = capture_page_state(page, url)
+    after_submit = nombre == "Enviar"
 
     try:
-        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        time.sleep(1)
+        try:
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            pause_action(runtime_config, multiplier=0.8)
+        except Exception:
+            pass
 
         for texto in textos_buscar:
             botones = page.locator(f'[role="button"]:has-text("{texto}")').all()
@@ -72,8 +84,7 @@ def click_boton(page, nombre: str, url: str = "") -> bool:
                 if btn.is_visible():
                     btn.scroll_into_view_if_needed()
                     btn.click()
-                    time.sleep(2)
-                    page.wait_for_load_state("networkidle")
+                    wait_for_post_action(page, before_state, url, runtime_config, after_submit=after_submit)
                     print(f"    Boton '{texto}' clickeado (role-button)")
                     return True
 
@@ -88,8 +99,7 @@ def click_boton(page, nombre: str, url: str = "") -> bool:
                 return false;
             }}''')
             if clicked:
-                time.sleep(2)
-                page.wait_for_load_state("networkidle")
+                wait_for_post_action(page, before_state, url, runtime_config, after_submit=after_submit)
                 print(f"    Boton '{texto}' clickeado (js)")
                 return True
 
@@ -97,8 +107,7 @@ def click_boton(page, nombre: str, url: str = "") -> bool:
                 span = page.locator(f'[role="button"] span:text-is("{texto}")').first
                 if span.is_visible():
                     span.click()
-                    time.sleep(2)
-                    page.wait_for_load_state("networkidle")
+                    wait_for_post_action(page, before_state, url, runtime_config, after_submit=after_submit)
                     print(f"    Boton '{texto}' clickeado (span)")
                     return True
             except Exception:
@@ -108,8 +117,7 @@ def click_boton(page, nombre: str, url: str = "") -> bool:
                 btn_html = page.locator(f'button:has-text("{texto}")').first
                 if btn_html.is_visible():
                     btn_html.click()
-                    time.sleep(2)
-                    page.wait_for_load_state("networkidle")
+                    wait_for_post_action(page, before_state, url, runtime_config, after_submit=after_submit)
                     print(f"    Boton '{texto}' clickeado (button html)")
                     return True
             except Exception:
@@ -119,8 +127,7 @@ def click_boton(page, nombre: str, url: str = "") -> bool:
                 submit = page.locator(f'input[type="submit"][value="{texto}"]').first
                 if submit.is_visible():
                     submit.click()
-                    time.sleep(2)
-                    page.wait_for_load_state("networkidle")
+                    wait_for_post_action(page, before_state, url, runtime_config, after_submit=after_submit)
                     print(f"    Boton '{texto}' clickeado (input submit)")
                     return True
             except Exception:
@@ -139,8 +146,7 @@ def click_boton(page, nombre: str, url: str = "") -> bool:
                         if btn.is_visible():
                             btn.scroll_into_view_if_needed()
                             btn.click(force=True)
-                            time.sleep(2)
-                            page.wait_for_load_state("networkidle")
+                            wait_for_post_action(page, before_state, url, runtime_config, after_submit=after_submit)
                             print(f"    Boton '{texto}' clickeado (text-node)")
                             return True
                     except Exception:
@@ -166,48 +172,11 @@ def _expandir_nombre_boton(nombre: str, platform: dict) -> list[str]:
     return mapping.get(nombre, [nombre])
 
 
-def verificar_envio(page, url: str = "", submit_clicked: bool = False) -> bool:
+def verificar_envio(page, url: str = "", submit_clicked: bool = False, runtime_config: dict | None = None) -> bool:
     """Verifica si el formulario se envio correctamente con multiples metodos."""
-    platform = detectar_plataforma(url) if url else GENERIC
-    time.sleep(3)
-
-    for pattern in platform.get("success_url_patterns", []):
-        if pattern in page.url:
-            return True
-
-    contenido = page.content().lower()
-    for texto in platform.get("success_texts", []):
-        if texto in contenido:
-            return True
-
-    if platform.get("name") == "microsoft_forms":
-        try:
-            confirmation = page.locator(
-                '[class*="thank"], [class*="confirmation"], '
-                '[data-automation-id="thankYouMessage"], '
-                '[class*="post-submit"]'
-            )
-            if confirmation.count() > 0:
-                return True
-        except Exception:
-            pass
-        return False
-
-    if not submit_clicked:
-        return False
-
-    try:
-        enviar_visible = _hay_boton_visible(page, platform.get("submit_texts", ["Enviar", "Submit"]))
-        siguiente_visible = _hay_boton_visible(page, platform.get("next_texts", ["Siguiente", "Next"]))
-        elementos_interactivos = page.locator(
-            '[role="listitem"], input:not([type="hidden"]), textarea, [role="radio"], [role="checkbox"], [role="listbox"]'
-        ).count()
-        if not enviar_visible and not siguiente_visible and elementos_interactivos == 0:
-            return True
-    except Exception:
-        pass
-
-    return False
+    if has_success_signal(page, url, submit_clicked=submit_clicked):
+        return True
+    return wait_for_submission_signal(page, url, runtime_config, submit_clicked=submit_clicked)
 
 
 def _hay_boton_visible(page, textos: list[str]) -> bool:

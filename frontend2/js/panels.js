@@ -78,8 +78,14 @@ async function addProvider() {
 async function loadSettings() {
     try {
         const settings = await apiGet("config/settings");
+        if (typeof applyExecutionSettings === "function") {
+            applyExecutionSettings(settings);
+        }
         const container = document.getElementById("settingsInfo");
         if (!container) return;
+        const profilesText = (settings.execution_profiles || [])
+            .map(p => `${p.label}: ${p.description}`)
+            .join(" | ");
         container.innerHTML = `
             <div class="settings-grid">
                 <div class="setting-item">
@@ -101,6 +107,18 @@ async function loadSettings() {
                 <div class="setting-item">
                     <span class="setting-label">Pausa entre envios</span>
                     <span class="setting-value">${settings.pausa_min}s - ${settings.pausa_max}s</span>
+                </div>
+                <div class="setting-item">
+                    <span class="setting-label">Headless default</span>
+                    <span class="setting-value">${settings.default_headless ? 'Si' : 'No'}</span>
+                </div>
+                <div class="setting-item">
+                    <span class="setting-label">Perfil default</span>
+                    <span class="setting-value">${settings.default_execution_profile}</span>
+                </div>
+                <div class="setting-item">
+                    <span class="setting-label">Perfiles ejecucion</span>
+                    <span class="setting-value">${profilesText || 'Sin datos'}</span>
                 </div>
                 <div class="setting-item">
                     <span class="setting-label">IA Temperature</span>

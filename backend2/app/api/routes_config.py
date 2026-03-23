@@ -2,6 +2,7 @@
 Rutas API para configuración global y proveedores de IA.
 """
 from flask import Blueprint, jsonify, request, current_app
+from app.automation.timing import DEFAULT_EXECUTION_PROFILE, get_execution_profile_options
 from app.database.connection import db
 from app.database.models import AIProviderConfig, PromptTemplate
 
@@ -95,6 +96,9 @@ def obtener_settings():
         "ai_temperature": current_app.config.get("AI_TEMPERATURE"),
         "ai_max_tokens": current_app.config.get("AI_MAX_TOKENS"),
         "default_ai_provider": current_app.config.get("DEFAULT_AI_PROVIDER"),
+        "default_headless": True,
+        "default_execution_profile": DEFAULT_EXECUTION_PROFILE,
+        "execution_profiles": get_execution_profile_options(),
     })
 
 
