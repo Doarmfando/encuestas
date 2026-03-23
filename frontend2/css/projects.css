@@ -78,6 +78,50 @@
 }
 .config-select:focus { outline: none; border-color: var(--accent); }
 
+.config-toolbar {
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.config-list-summary {
+    display: grid;
+    gap: 8px;
+}
+
+.config-list-summary .history-item {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+
+.config-list-summary .history-item:hover {
+    margin: 0;
+    padding: 10px 12px;
+    border-color: var(--accent);
+}
+
+.config-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.config-badge.active {
+    background: rgba(72,187,120,0.2);
+    color: var(--success);
+}
+
+.config-badge.inactive {
+    background: rgba(113, 128, 150, 0.2);
+    color: var(--text-muted);
+}
+
 /* ═══════════════ DASHBOARD ═══════════════ */
 
 .dashboard-card {

@@ -153,9 +153,10 @@ async function abrirProyecto(projectId) {
             if (project.config_activa) {
                 config = project.config_activa;
                 mostrarConfiguracion(config);
-                cargarConfigSelector(projectId);
+                await cargarConfigSelector(projectId);
                 setStep(4);
             } else {
+                await cargarConfigSelector(projectId);
                 setStep(2);
             }
         } else {
@@ -312,8 +313,8 @@ function mostrarIAPreview(data) {
 
     // Validaciones
     const warnings = [];
-    if (perfiles.length < 3) warnings.push("Se necesitan minimo 3 perfiles");
-    if (tendencias.length < 3) warnings.push("Se necesitan minimo 3 tendencias");
+    if (perfiles.length < 3 || perfiles.length > 4) warnings.push("Se necesitan entre 3 y 4 perfiles");
+    if (tendencias.length < 3 || tendencias.length > 4) warnings.push("Se necesitan entre 3 y 4 tendencias");
     if (reglas.length < 1) warnings.push("Se necesita minimo 1 regla");
 
     const totalFreqP = perfiles.reduce((s, p) => s + (p.frecuencia || 0), 0);
@@ -361,9 +362,11 @@ async function aplicarConfigIA() {
         });
 
         config = result;
+        currentProject.config_activa = result;
+        currentProject.status = "configurado";
         mostrarConfiguracion(result);
-        cargarConfigSelector(currentProject.id);
-        setStep(3);
+        await cargarConfigSelector(currentProject.id);
+        setStep(4);
         hideEl("iaPreviewOverlay");
         iaPreviewData = null;
 
@@ -378,9 +381,38 @@ async function cargarConfigSelector(projectId) {
     try {
         const configs = await apiGet(`projects/${projectId}/configs`);
         const select = document.getElementById("configSelector");
+        const summary = document.getElementById("configListSummary");
+
+        if (!configs.length) {
+            select.innerHTML = "";
+            if (summary) {
+                summary.innerHTML = '<div class="empty-state-sm">Sin configuraciones guardadas</div>';
+            }
+            return configs;
+        }
+
         select.innerHTML = configs.map(c =>
-            `<option value="${c.id}" ${c.is_active ? 'selected' : ''}>${c.nombre} ${c.is_active ? '(activa)' : ''}</option>`
+            `<option value="${c.id}" ${c.is_active ? "selected" : ""}>${c.nombre} ${c.is_active ? "(activa)" : ""}</option>`
         ).join("");
+
+        if (summary) {
+            summary.innerHTML = configs.map(c => `
+                <div class="history-item" onclick="cambiarConfig(${c.id})">
+                    <div class="history-title">
+                        <span class="config-badge ${c.is_active ? "active" : "inactive"}">${c.is_active ? "Activa" : "Guardada"}</span>
+                        ${c.nombre}
+                    </div>
+                    <div class="history-meta">
+                        <span>${c.total_perfiles || 0} perfiles</span>
+                        <span>${c.total_tendencias || 0} tendencias</span>
+                        <span>${c.total_reglas || 0} reglas</span>
+                        <span>${c.ai_provider_used || "manual"}</span>
+                        <span>${timeAgo(c.updated_at || c.created_at)}</span>
+                    </div>
+                </div>
+            `).join("");
+        }
+        return configs;
     } catch (e) { /* ignore */ }
 }
 
@@ -402,7 +434,9 @@ async function guardarConfig() {
     try {
         const configId = config.id;
         if (configId) {
-            await apiPut(`projects/${currentProject.id}/configs/${configId}`, config);
+            config = await apiPut(`projects/${currentProject.id}/configs/${configId}`, config);
+            currentProject.config_activa = config;
+            await cargarConfigSelector(currentProject.id);
         }
     } catch (e) {
         console.error("Error guardando config:", e);
@@ -415,6 +449,43 @@ function importConfigDirect() {
     document.getElementById("fileImportDirect").click();
 }
 
+function validarImportacionConfig(data) {
+    if (!data.perfiles || data.perfiles.length < 3) {
+        throw new Error("El JSON debe tener al menos 3 perfiles");
+    }
+    if (!data.tendencias_escalas || data.tendencias_escalas.length < 3) {
+        throw new Error("El JSON debe tener al menos 3 tendencias");
+    }
+    if (!data.reglas_dependencia || data.reglas_dependencia.length < 1) {
+        throw new Error("El JSON debe tener al menos 1 regla");
+    }
+}
+
+async function importarConfigProyecto(data, fallbackName = "Importado") {
+    if (!currentProject) throw new Error("No hay proyecto activo");
+
+    validarImportacionConfig(data);
+    const replaceExisting = Boolean(config?.id);
+    const result = await apiPost(`projects/${currentProject.id}/configs`, {
+        nombre: data.nombre || fallbackName,
+        perfiles: data.perfiles,
+        reglas_dependencia: data.reglas_dependencia,
+        tendencias_escalas: data.tendencias_escalas,
+        replace_existing: replaceExisting,
+        replace_config_id: replaceExisting ? config.id : null,
+    });
+
+    config = result;
+    currentProject.config_activa = result;
+    currentProject.status = "configurado";
+    mostrarConfiguracion(result);
+    await cargarConfigSelector(currentProject.id);
+    setStep(4);
+    showEl("seccion3");
+    showEl("seccion4");
+    return { result, replaceExisting };
+}
+
 async function handleImportDirect(event) {
     const file = event.target.files[0];
     if (!file || !currentProject) return;
@@ -422,33 +493,11 @@ async function handleImportDirect(event) {
     reader.onload = async (e) => {
         try {
             const data = JSON.parse(e.target.result);
-            if (!data.perfiles || data.perfiles.length < 3) {
-                alert("El JSON debe tener al menos 3 perfiles");
-                return;
-            }
-            if (!data.tendencias_escalas || data.tendencias_escalas.length < 3) {
-                alert("El JSON debe tener al menos 3 tendencias");
-                return;
-            }
-            if (!data.reglas_dependencia || data.reglas_dependencia.length < 1) {
-                alert("El JSON debe tener al menos 1 regla");
-                return;
-            }
-
-            const result = await apiPost(`projects/${currentProject.id}/configs`, {
-                nombre: data.nombre || file.name.replace('.json', ''),
-                perfiles: data.perfiles,
-                reglas_dependencia: data.reglas_dependencia,
-                tendencias_escalas: data.tendencias_escalas,
-            });
-
-            config = result;
-            mostrarConfiguracion(result);
-            cargarConfigSelector(currentProject.id);
-            setStep(3);
-            showEl("seccion3");
-            showEl("seccion4");
-            alert("Config importada correctamente");
+            const { replaceExisting } = await importarConfigProyecto(
+                data,
+                file.name.replace(/\.json$/i, "")
+            );
+            alert(replaceExisting ? "Config reemplazada correctamente" : "Config importada correctamente");
         } catch (err) {
             alert("Error: " + err.message);
         }

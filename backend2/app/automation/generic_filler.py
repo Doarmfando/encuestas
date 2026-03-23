@@ -67,6 +67,7 @@ class GenericFiller(BaseFiller):
         is_ms = platform["name"] == "microsoft_forms"
         ms_submit_result = None
         submit_clicked = False
+        ms_page_failed = False
 
         for pag_idx, pagina in enumerate(paginas):
             print(f"  [Pág {pag_idx + 1}/{len(paginas)}]")
@@ -75,9 +76,20 @@ class GenericFiller(BaseFiller):
             botones = pagina.get("botones", [])
 
             if is_ms:
-                self.ms_filler.fill_page(page, respuestas, runtime_config=runtime_config)
+                ms_result = self.ms_filler.fill_page(page, respuestas, runtime_config=runtime_config)
+                if not ms_result.get("ok", False):
+                    ms_page_failed = True
+                    failed = ms_result.get("failed_questions", [])
+                    preview = "; ".join(q[:50] for q in failed[:3])
+                    print(f"    [MS] Abortando pagina: {ms_result.get('failed', 0)} pregunta(s) no se llenaron")
+                    if preview:
+                        print(f"    [MS] Fallidas: {preview}")
+                    break
             else:
                 self._fill_generic_page(page, respuestas, runtime_config=runtime_config)
+
+            if ms_page_failed:
+                break
 
             if "Siguiente" in botones:
                 if is_ms:
@@ -91,7 +103,9 @@ class GenericFiller(BaseFiller):
                     submit_clicked = click_boton(page, "Enviar", url, runtime_config=runtime_config)
 
         # Para MS Forms, click_submit ya verificó el envío internamente
-        if is_ms and ms_submit_result is not None:
+        if is_ms and ms_page_failed:
+            exito = False
+        elif is_ms and ms_submit_result is not None:
             exito = ms_submit_result
         else:
             exito = verificar_envio(page, url, submit_clicked=submit_clicked, runtime_config=runtime_config)

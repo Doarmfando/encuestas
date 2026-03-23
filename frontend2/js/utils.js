@@ -121,28 +121,22 @@ function importConfig() {
 
 function handleImport(event) {
     const file = event.target.files[0];
-    if (!file) return;
+    if (!file || !currentProject) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
         try {
             const data = JSON.parse(e.target.result);
             if (data.perfiles || data.reglas_dependencia || data.tendencias_escalas) {
-                delete data.id;
-                if (config) {
-                    config.perfiles = data.perfiles || config.perfiles;
-                    config.reglas_dependencia = data.reglas_dependencia || config.reglas_dependencia;
-                    config.tendencias_escalas = data.tendencias_escalas || config.tendencias_escalas;
-                } else {
-                    config = data;
-                }
-                mostrarConfiguracion(config);
-                guardarConfig();
-                alert("Configuracion importada correctamente");
+                const { replaceExisting } = await importarConfigProyecto(
+                    data,
+                    file.name.replace(/\.json$/i, "")
+                );
+                alert(replaceExisting ? "Configuracion reemplazada correctamente" : "Configuracion importada correctamente");
             } else {
                 alert("JSON no tiene formato de configuracion valido");
             }
         } catch (err) {
-            alert("Error parseando JSON: " + err.message);
+            alert("Error: " + err.message);
         }
     };
     reader.readAsText(file);

@@ -2,7 +2,9 @@
 Llenador específico para Microsoft Forms.
 Usa FillingStrategies compartidas + selectores específicos de MS Forms.
 """
-import time
+import re
+import unicodedata
+from difflib import SequenceMatcher
 
 from app.automation.filling_strategies import FillingStrategies
 from app.automation.navigation.waits import capture_page_state, wait_for_form_ready, wait_for_post_action, wait_for_submission_signal
@@ -12,13 +14,17 @@ from app.constants.question_types import TIPOS_NO_LLENABLES
 # Selectores específicos de MS Forms
 MS_TEXT_SELECTORS = [
     'input[aria-label="Single line text"]',
+    'input[role="textbox"]',
+    '[role="textbox"] input',
     'input[type="text"]',
+    '[contenteditable="true"]',
     'input:not([type="radio"]):not([type="checkbox"]):not([type="hidden"])',
 ]
 MS_TEXTAREA_SELECTORS = [
     'textarea',
-    'input[aria-label="Long answer text"]',
+    'div[role="textbox"]',
     '[contenteditable="true"]',
+    'input[aria-label="Long answer text"]',
 ]
 MS_NUMBER_SELECTORS = [
     'input[type="number"]',
@@ -27,6 +33,14 @@ MS_NUMBER_SELECTORS = [
     'input[aria-label*="número" i]',
     'input[type="text"]',
     'input:not([type="radio"]):not([type="checkbox"]):not([type="hidden"])',
+]
+MS_CONTAINER_SELECTORS = [
+    '#question-list [data-automation-id*="question"]',
+    '#question-list [class*="question-container"]',
+    '#question-list [class*="office-form-question"]',
+    '#question-list fieldset',
+    '#question-list [role="group"]',
+    '#question-list > div',
 ]
 
 fs = FillingStrategies()
@@ -37,9 +51,18 @@ class MSFormsFiller:
 
     def fill_page(self, page, respuestas: list, runtime_config: dict | None = None):
         """Llena todas las respuestas de una página de MS Forms."""
+        result = {
+            "ok": False,
+            "filled": 0,
+            "failed": 0,
+            "failed_questions": [],
+        }
+
         if not wait_for_form_ready(page, page.url, runtime_config):
             print("    [MS] No se encontró #question-list")
-            return
+            result["failed"] = 1
+            result["failed_questions"].append("__page__")
+            return result
 
         for resp_idx, resp in enumerate(respuestas):
             tipo = resp["tipo"]
@@ -49,16 +72,24 @@ class MSFormsFiller:
             container = self._find_question(page, resp_idx, pregunta)
             if not container:
                 print(f"    [MS] No encontré: {pregunta[:50]}")
+                result["failed"] += 1
+                result["failed_questions"].append(pregunta)
                 continue
 
             filled = self._fill_element(container, page, tipo, valor, pregunta, runtime_config=runtime_config)
 
             if filled:
                 print(f"    OK: {pregunta[:50]}")
+                result["filled"] += 1
             else:
                 print(f"    FALLÓ: {pregunta[:50]}")
+                result["failed"] += 1
+                result["failed_questions"].append(pregunta)
 
             pause_action(runtime_config)
+
+        result["ok"] = result["failed"] == 0
+        return result
 
     def click_submit(self, page, url: str = "", runtime_config: dict | None = None) -> bool:
         """Click en botón Enviar/Submit de MS Forms."""
@@ -82,35 +113,87 @@ class MSFormsFiller:
 
     def _find_question(self, page, expected_idx: int, pregunta: str):
         """Encuentra la div de la pregunta en #question-list."""
-        question_divs = page.locator('#question-list > div')
-        total = question_divs.count()
-        if total == 0:
+        candidates = self._visible_question_containers(page)
+        if not candidates:
             return None
 
-        visible_divs = []
-        for i in range(total):
-            div = question_divs.nth(i)
+        pregunta_norm = self._normalize_question(pregunta)
+        best_container = None
+        best_score = 0
+
+        for container in candidates:
             try:
-                if div.is_visible(timeout=500):
-                    visible_divs.append(div)
+                text = container.inner_text(timeout=1500)
             except Exception:
                 continue
 
-        # Buscar por texto
-        preg_lower = pregunta.lower().strip()[:35]
-        for div in visible_divs:
-            try:
-                text = div.inner_text(timeout=2000).lower().strip()
-                if preg_lower in text:
-                    return div
-            except Exception:
-                continue
+            score = self._score_question_match(pregunta_norm, self._normalize_question(text))
+            if score > best_score:
+                best_score = score
+                best_container = container
 
-        # Fallback: por índice
-        if expected_idx < len(visible_divs):
-            return visible_divs[expected_idx]
+        if best_container and best_score >= 250:
+            return best_container
 
+        if expected_idx < len(candidates):
+            return candidates[expected_idx]
         return None
+
+    def _visible_question_containers(self, page):
+        """Retorna contenedores visibles con controles rellenables."""
+        for selector in MS_CONTAINER_SELECTORS:
+            try:
+                locator = page.locator(selector)
+                candidates = []
+                for idx in range(locator.count()):
+                    container = locator.nth(idx)
+                    try:
+                        if not container.is_visible(timeout=300):
+                            continue
+                        if self._container_has_fillable_controls(container):
+                            candidates.append(container)
+                    except Exception:
+                        continue
+                if candidates:
+                    return candidates
+            except Exception:
+                continue
+        return []
+
+    @staticmethod
+    def _container_has_fillable_controls(container) -> bool:
+        selectors = (
+            'input:not([type="hidden"]), textarea, select, [role="radio"], [role="checkbox"], '
+            '[role="combobox"], [role="listbox"], [class*="rating"] button, button[aria-posinset]'
+        )
+        try:
+            return container.locator(selectors).count() > 0
+        except Exception:
+            return False
+
+    @staticmethod
+    def _normalize_question(value: str) -> str:
+        text = unicodedata.normalize("NFKD", str(value or ""))
+        text = "".join(ch for ch in text if not unicodedata.combining(ch))
+        text = re.sub(r"[^\w\s]", " ", text.lower())
+        return re.sub(r"\s+", " ", text).strip()
+
+    @staticmethod
+    def _score_question_match(target: str, candidate: str) -> int:
+        if not target or not candidate:
+            return 0
+        if target == candidate:
+            return 2000
+        score = 0
+        if target in candidate:
+            score += 1200 + min(len(target), 200)
+        ratio = SequenceMatcher(None, target, candidate[: max(len(target) * 2, 120)]).ratio()
+        score += int(ratio * 600)
+        target_tokens = [tok for tok in target.split() if len(tok) >= 4]
+        if target_tokens:
+            overlap = sum(1 for tok in target_tokens if tok in candidate)
+            score += overlap * 120
+        return score
 
     # ========== ROUTER DE TIPOS ==========
 

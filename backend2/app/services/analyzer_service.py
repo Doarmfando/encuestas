@@ -12,6 +12,29 @@ from app.database.models import PromptTemplate
 class AnalyzerService:
     """Analiza encuestas con IA para generar perfiles, reglas y tendencias."""
 
+    MIN_PERFILES = 3
+    MAX_PERFILES = 4
+    MIN_TENDENCIAS = 3
+    MAX_TENDENCIAS = 4
+    SAFE_PROFILE_NAMES = [
+        "Perfil conductual A",
+        "Perfil conductual B",
+        "Perfil conductual C",
+        "Perfil conductual D",
+    ]
+    DEMOGRAPHIC_QUESTION_KEYWORDS = (
+        "edad", "age", "sexo", "género", "genero", "gender", "ocupación", "ocupacion",
+        "trabajo", "trabaja", "profesión", "profesion", "estudia", "estudiante",
+        "estado civil", "casado", "soltero", "convive", "vive", "hijos", "embarazo",
+        "educación", "educacion", "instrucción", "instruccion",
+    )
+    UNSUPPORTED_PROFILE_KEYWORDS = (
+        "ama de casa", "amas de casa", "joven", "adolescente", "adulto", "adulta",
+        "hombre", "mujer", "madre", "padre", "mamá", "mama", "papá", "papa",
+        "profesional", "independiente", "emprendedor", "emprendedora", "estudiante",
+        "casado", "casada", "soltero", "soltera",
+    )
+
     def __init__(self, ai_service: AIService):
         self.ai = ai_service
 
@@ -28,10 +51,10 @@ class AnalyzerService:
             user_prompt_tpl = PROMPT_ANALISIS_ENCUESTA
             try:
                 p_sys = PromptTemplate.query.filter_by(slug="system_analysis").first()
-                if p_sys:
+                if p_sys and not p_sys.is_default:
                     system_prompt = p_sys.contenido
                 p_usr = PromptTemplate.query.filter_by(slug="user_analysis").first()
-                if p_usr:
+                if p_usr and not p_usr.is_default:
                     user_prompt_tpl = p_usr.contenido
             except Exception:
                 pass
@@ -81,6 +104,10 @@ class AnalyzerService:
             "descripcion": estructura.get("descripcion", ""),
             "preguntas": [],
             "preguntas_escala_likert": [],
+            "limites_configuracion": {
+                "perfiles": {"min": self.MIN_PERFILES, "max": self.MAX_PERFILES},
+                "tendencias": {"min": self.MIN_TENDENCIAS, "max": self.MAX_TENDENCIAS},
+            },
         }
 
         # Detectar opciones Likert repetidas para agrupar
@@ -115,6 +142,14 @@ class AnalyzerService:
                 elif opciones:
                     entry["opciones"] = opciones[:5] + [f"... (+{len(opciones)-5} más)"]
                 resumen["preguntas"].append(entry)
+
+        senales_demo = self._detectar_senales_demograficas_en_resumen(resumen["preguntas"])
+        resumen["senales_demograficas_detectadas"] = senales_demo
+        if not senales_demo:
+            resumen["restriccion_perfiles"] = (
+                "No hay preguntas demográficas explícitas. "
+                "Los perfiles deben ser conductuales/actitudinales y no demográficos."
+            )
 
         # Resumen de escalas
         if resumen["preguntas_escala_likert"]:
@@ -201,10 +236,15 @@ class AnalyzerService:
                     del perfil["respuestas"][texto_pregunta]
 
         # Normalizar frecuencias de perfiles a 100
+        resultado["perfiles"] = self._asegurar_cantidad_perfiles(resultado["perfiles"], preguntas_ref)
+        self._sanitizar_perfiles_no_soportados(resultado["perfiles"], preguntas_ref)
         self._normalizar_frecuencias(resultado["perfiles"])
 
         # Corregir tendencias
         self._corregir_tendencias(resultado, tiene_escalas, tamaños_escala)
+        resultado["tendencias_escalas"] = self._asegurar_cantidad_tendencias(
+            resultado["tendencias_escalas"], tamaños_escala
+        )
 
         # Normalizar frecuencias de tendencias a 100
         if resultado["tendencias_escalas"]:
@@ -420,16 +460,47 @@ class AnalyzerService:
             return
         total = sum(opciones.values())
         if total > 0 and total != 100:
-            factor = 100 / total
-            config["opciones"] = {k: max(1, round(v * factor)) for k, v in opciones.items()}
+            keys = list(opciones.keys())
+            values = [opciones[k] for k in keys]
+            normalizados = self._ajustar_suma_exacta(values, target=100, min_value=1)
+            config["opciones"] = {k: v for k, v in zip(keys, normalizados)}
 
     def _normalizar_frecuencias(self, items: list):
         """Normaliza frecuencias de una lista de items a 100."""
         total = sum(item.get("frecuencia", 0) for item in items)
         if total > 0 and total != 100:
-            factor = 100 / total
-            for item in items:
-                item["frecuencia"] = max(1, round(item.get("frecuencia", 0) * factor))
+            values = [item.get("frecuencia", 0) for item in items]
+            normalizados = self._ajustar_suma_exacta(values, target=100, min_value=1)
+            for item, value in zip(items, normalizados):
+                item["frecuencia"] = value
+
+    def _ajustar_suma_exacta(self, values: list, target: int = 100, min_value: int = 1) -> list:
+        """Ajusta una distribución entera para que sume exactamente target."""
+        if not values:
+            return []
+        total = sum(values)
+        if total <= 0:
+            base = [min_value for _ in values]
+            total = sum(base)
+            values = base
+
+        scaled = [max(min_value, round(v * target / total)) for v in values]
+        diff = target - sum(scaled)
+
+        while diff != 0:
+            if diff > 0:
+                idx = min(range(len(scaled)), key=lambda i: scaled[i])
+                scaled[idx] += 1
+                diff -= 1
+            else:
+                candidates = [i for i, value in enumerate(scaled) if value > min_value]
+                if not candidates:
+                    break
+                idx = max(candidates, key=lambda i: scaled[i])
+                scaled[idx] -= 1
+                diff += 1
+
+        return scaled
 
     def _generar_respuesta_default(self, ref_preg: dict) -> dict:
         """Genera una respuesta default para preguntas que la IA no incluyó."""
@@ -455,6 +526,121 @@ class AnalyzerService:
             }
 
         return {"tipo": "fijo", "valor": ""}
+
+    def _detectar_senales_demograficas_en_resumen(self, preguntas: list[dict]) -> list[str]:
+        """Extrae señales demográficas explícitas desde el resumen enviado a IA."""
+        halladas = []
+        for pregunta in preguntas:
+            texto = str(pregunta.get("texto", "")).lower()
+            for keyword in self.DEMOGRAPHIC_QUESTION_KEYWORDS:
+                if keyword in texto and keyword not in halladas:
+                    halladas.append(keyword)
+        return halladas
+
+    def _survey_supports_demographics(self, preguntas_ref: list) -> bool:
+        """Determina si el formulario realmente pregunta datos demográficos."""
+        for pregunta in preguntas_ref:
+            texto = str(pregunta.get("texto", "")).lower()
+            if any(keyword in texto for keyword in self.DEMOGRAPHIC_QUESTION_KEYWORDS):
+                return True
+        return False
+
+    def _asegurar_cantidad_perfiles(self, perfiles: list, preguntas_ref: list) -> list:
+        """Garantiza entre 3 y 4 perfiles para que el flujo no falle."""
+        perfiles = list(perfiles or [])[: self.MAX_PERFILES]
+        if len(perfiles) >= self.MIN_PERFILES:
+            return perfiles
+
+        faltantes = self.MIN_PERFILES - len(perfiles)
+        perfiles_default = self._crear_perfiles_default(preguntas_ref, faltantes, offset=len(perfiles))
+        perfiles.extend(perfiles_default)
+        return perfiles[: self.MAX_PERFILES]
+
+    def _crear_perfiles_default(self, preguntas_ref: list, cantidad: int, offset: int = 0) -> list:
+        """Crea perfiles genéricos seguros cuando la IA devuelve muy pocos."""
+        perfiles = []
+        frecuencias_base = [40, 35, 25, 20]
+        for idx in range(cantidad):
+            nombre_idx = min(offset + idx, len(self.SAFE_PROFILE_NAMES) - 1)
+            perfil = {
+                "nombre": self.SAFE_PROFILE_NAMES[nombre_idx],
+                "descripcion": (
+                    "Perfil basado en patrones observables del formulario, "
+                    "sin asumir rasgos demográficos no preguntados."
+                ),
+                "frecuencia": frecuencias_base[min(offset + idx, len(frecuencias_base) - 1)],
+                "respuestas": {},
+            }
+            for ref in preguntas_ref:
+                if not self._es_escala(ref["tipo"], ref.get("opciones", [])):
+                    perfil["respuestas"][ref["texto"]] = self._generar_respuesta_default(ref)
+            perfiles.append(perfil)
+        return perfiles
+
+    def _sanitizar_perfiles_no_soportados(self, perfiles: list, preguntas_ref: list):
+        """Evita perfiles demográficos inventados cuando el formulario no pregunta demografía."""
+        if self._survey_supports_demographics(preguntas_ref):
+            return
+
+        replacement_idx = 0
+        for perfil in perfiles:
+            texto = f"{perfil.get('nombre', '')} {perfil.get('descripcion', '')}".lower()
+            if any(keyword in texto for keyword in self.UNSUPPORTED_PROFILE_KEYWORDS):
+                safe_name = self.SAFE_PROFILE_NAMES[min(replacement_idx, len(self.SAFE_PROFILE_NAMES) - 1)]
+                perfil["nombre"] = safe_name
+                perfil["descripcion"] = (
+                    "Perfil conductual derivado de patrones de respuesta del formulario, "
+                    "sin asumir edad, sexo, ocupación u otros rasgos no preguntados."
+                )
+                replacement_idx += 1
+
+    def _asegurar_cantidad_tendencias(self, tendencias: list, tamaños: set) -> list:
+        """Garantiza entre 3 y 4 tendencias, incluso si no hay escalas explícitas."""
+        tendencias = list(tendencias or [])[: self.MAX_TENDENCIAS]
+        if len(tendencias) >= self.MIN_TENDENCIAS:
+            return tendencias
+
+        defaults = self._crear_tendencias_default(tamaños)
+        existentes = {t.get("nombre", "") for t in tendencias}
+        for default in defaults:
+            if default["nombre"] not in existentes:
+                tendencias.append(default)
+                existentes.add(default["nombre"])
+            if len(tendencias) >= self.MIN_TENDENCIAS:
+                break
+        return tendencias[: self.MAX_TENDENCIAS]
+
+    def _crear_tendencias_default(self, tamaños: set) -> list:
+        """Crea tendencias genéricas reutilizables para el flujo de la app."""
+        tamaños_escala = set(tamaños or set()) or {5, 7, 11}
+        distribuciones_medio = {}
+        distribuciones_alto = {}
+        distribuciones_bajo = {}
+        for tam in tamaños_escala:
+            distribuciones_medio[str(tam)] = self._dist_centrada(tam)
+            distribuciones_alto[str(tam)] = self._dist_sesgada_alta(tam)
+            distribuciones_bajo[str(tam)] = self._dist_sesgada_baja(tam)
+
+        return [
+            {
+                "nombre": "Término Medio",
+                "descripcion": "Responde en valores centrales y estables.",
+                "frecuencia": 40,
+                "distribuciones": distribuciones_medio,
+            },
+            {
+                "nombre": "Centro-Alto",
+                "descripcion": "Tiende a responder ligeramente por encima del centro.",
+                "frecuencia": 30,
+                "distribuciones": distribuciones_alto,
+            },
+            {
+                "nombre": "Centro-Bajo",
+                "descripcion": "Tiende a responder ligeramente por debajo del centro.",
+                "frecuencia": 30,
+                "distribuciones": distribuciones_bajo,
+            },
+        ]
 
     def _es_escala(self, tipo: str, opciones: list = None) -> bool:
         """Determina si un tipo de pregunta es escala (incluye Likert disfrazado de opcion_multiple)."""
@@ -672,11 +858,7 @@ class AnalyzerService:
     def _corregir_tendencias(self, resultado: dict, tiene_escalas: bool, tamaños: set):
         """Corrige o genera tendencias de escala."""
         tendencias = resultado.get("tendencias_escalas", [])
-
-        # Si no hay escalas, limpiar tendencias
-        if not tiene_escalas:
-            resultado["tendencias_escalas"] = []
-            return
+        tamaños_objetivo = set(tamaños or set()) or {5, 7, 11}
 
         # Corregir "distribucion" → "distribuciones" y asegurar tamaños correctos
         for t in tendencias:
@@ -689,7 +871,7 @@ class AnalyzerService:
                 t["distribuciones"] = {}
 
             # Asegurar que hay distribución para cada tamaño de escala
-            for tam in tamaños:
+            for tam in tamaños_objetivo:
                 tam_str = str(tam)
                 if tam_str not in t["distribuciones"]:
                     # Generar distribución centrada
@@ -699,40 +881,10 @@ class AnalyzerService:
             for tam_str, dist in t["distribuciones"].items():
                 total = sum(dist)
                 if total > 0 and total != 100:
-                    t["distribuciones"][tam_str] = [
-                        max(1, round(v * 100 / total)) for v in dist
-                    ]
+                    t["distribuciones"][tam_str] = self._ajustar_suma_exacta(dist, target=100, min_value=1)
 
-        # Si hay escalas pero no hay tendencias, generar defaults
-        if not tendencias and tiene_escalas:
-            distribuciones_medio = {}
-            distribuciones_alto = {}
-            distribuciones_bajo = {}
-            for tam in tamaños:
-                distribuciones_medio[str(tam)] = self._dist_centrada(tam)
-                distribuciones_alto[str(tam)] = self._dist_sesgada_alta(tam)
-                distribuciones_bajo[str(tam)] = self._dist_sesgada_baja(tam)
-
-            resultado["tendencias_escalas"] = [
-                {
-                    "nombre": "Término Medio",
-                    "descripcion": "Responde en valores centrales",
-                    "frecuencia": 50,
-                    "distribuciones": distribuciones_medio,
-                },
-                {
-                    "nombre": "Centro-Alto",
-                    "descripcion": "Responde ligeramente por encima del centro",
-                    "frecuencia": 25,
-                    "distribuciones": distribuciones_alto,
-                },
-                {
-                    "nombre": "Centro-Bajo",
-                    "descripcion": "Responde ligeramente por debajo del centro",
-                    "frecuencia": 25,
-                    "distribuciones": distribuciones_bajo,
-                },
-            ]
+        if not tendencias:
+            resultado["tendencias_escalas"] = self._crear_tendencias_default(tamaños_objetivo)
 
     def _dist_centrada(self, tam: int) -> list:
         """Genera distribución centrada (campana) para escala de tamaño tam."""
@@ -741,8 +893,7 @@ class AnalyzerService:
         for i in range(tam):
             peso = max(1, round(40 * (1 / (1 + abs(i - centro)))))
             dist.append(peso)
-        total = sum(dist)
-        return [round(v * 100 / total) for v in dist]
+        return self._ajustar_suma_exacta(dist, target=100, min_value=1)
 
     def _dist_sesgada_alta(self, tam: int) -> list:
         """Genera distribución sesgada hacia arriba."""
@@ -751,8 +902,7 @@ class AnalyzerService:
         for i in range(tam):
             peso = max(1, round(40 * (1 / (1 + abs(i - centro)))))
             dist.append(peso)
-        total = sum(dist)
-        return [round(v * 100 / total) for v in dist]
+        return self._ajustar_suma_exacta(dist, target=100, min_value=1)
 
     def _dist_sesgada_baja(self, tam: int) -> list:
         """Genera distribución sesgada hacia abajo."""
@@ -761,8 +911,7 @@ class AnalyzerService:
         for i in range(tam):
             peso = max(1, round(40 * (1 / (1 + abs(i - centro)))))
             dist.append(peso)
-        total = sum(dist)
-        return [round(v * 100 / total) for v in dist]
+        return self._ajustar_suma_exacta(dist, target=100, min_value=1)
 
     # ========== REGLAS ==========
 
@@ -829,65 +978,29 @@ class AnalyzerService:
                     if n_opts > 0:
                         tamaños_escala.add(n_opts)
 
-        perfil_base = {
-            "nombre": "General",
-            "descripcion": "Perfil genérico con respuestas aleatorias",
-            "frecuencia": 100,
-            "tendencia_sugerida": None,
-            "reglas_coherencia": [
-                "Mantener consistencia básica entre edad, ocupación y estudios.",
-                "Responder las escalas con una tendencia estable y no contradictoria.",
-            ],
-            "respuestas": {},
-        }
-
-        for pregunta in preguntas:
-            ref = {
+        preguntas_ref = [
+            {
                 "texto": pregunta["texto"],
                 "tipo": pregunta.get("tipo", ""),
                 "opciones": pregunta.get("opciones", []),
             }
-            if not self._es_escala(ref["tipo"], ref.get("opciones", [])):
-                perfil_base["respuestas"][ref["texto"]] = self._generar_respuesta_default(ref)
-
-        # Tendencias solo si hay escalas
-        tendencias = []
-        if tiene_escalas:
-            distribuciones_medio = {}
-            distribuciones_alto = {}
-            distribuciones_bajo = {}
-            for tam in tamaños_escala:
-                distribuciones_medio[str(tam)] = self._dist_centrada(tam)
-                distribuciones_alto[str(tam)] = self._dist_sesgada_alta(tam)
-                distribuciones_bajo[str(tam)] = self._dist_sesgada_baja(tam)
-
-            tendencias = [
-                {
-                    "nombre": "Término Medio",
-                    "descripcion": "Responde en valores centrales",
-                    "frecuencia": 50,
-                    "distribuciones": distribuciones_medio,
-                },
-                {
-                    "nombre": "Centro-Alto",
-                    "descripcion": "Responde ligeramente por encima del centro",
-                    "frecuencia": 25,
-                    "distribuciones": distribuciones_alto,
-                },
-                {
-                    "nombre": "Centro-Bajo",
-                    "descripcion": "Responde ligeramente por debajo del centro",
-                    "frecuencia": 25,
-                    "distribuciones": distribuciones_bajo,
-                },
+            for pregunta in preguntas
+        ]
+        perfiles = self._crear_perfiles_default(preguntas_ref, self.MIN_PERFILES)
+        for perfil in perfiles:
+            perfil["tendencia_sugerida"] = "Término Medio"
+            perfil["reglas_coherencia"] = [
+                "Mantener coherencia entre las respuestas del mismo perfil.",
+                "Evitar suposiciones demográficas no preguntadas en el formulario.",
             ]
-            perfil_base["tendencia_sugerida"] = "Término Medio"
+
+        tendencias = self._crear_tendencias_default(tamaños_escala or {5, 7, 11})
 
         # Generar reglas básicas automáticas
         reglas = self._generar_reglas_fallback(preguntas)
 
         return {
-            "perfiles": [perfil_base],
+            "perfiles": perfiles,
             "reglas_dependencia": reglas,
             "tendencias_escalas": tendencias,
         }

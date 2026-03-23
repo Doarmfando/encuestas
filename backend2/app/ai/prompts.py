@@ -102,11 +102,18 @@ INSTRUCCIONES DETALLADAS:
 ═══════════════════════════════════════
 
 PERFILES:
-- Genera entre 3 y 5 perfiles variados, coherentes y realistas
+- Genera entre 3 y 4 perfiles variados, coherentes y realistas
 - Las frecuencias de TODOS los perfiles DEBEN sumar exactamente 100
 - Cada perfil debe incluir TODAS las preguntas de la encuesta (excepto informativas y escalas)
 - Los perfiles deben ser internamente coherentes (edad-ocupación-educación deben tener sentido entre sí)
 - Genera variedad real: diferentes edades, géneros, ocupaciones, opiniones
+- PERO NO inventes rasgos demográficos o roles sociales que no estén sustentados por el formulario.
+- Si la encuesta NO pregunta edad, sexo, género, ocupación, estudios, estado civil, hijos o variables similares:
+  los perfiles deben ser conductuales o actitudinales, no demográficos.
+- Evita etiquetas como "ama de casa", "joven emprendedor", "profesional independiente", etc.
+  si el formulario no da evidencia explícita para eso.
+- En formularios sin demografía explícita, nombra perfiles por comportamiento observable
+  (por ejemplo: ahorro, rapidez, preferencia, frecuencia, intención, satisfacción, etc.).
 - Si la encuesta tiene escalas, cada perfil debe proponer una "tendencia_sugerida" que combine con su historia.
 - Cada perfil debe incluir 2-5 "reglas_coherencia" breves y accionables para explicar por qué sus respuestas tienen sentido.
 - Las reglas_coherencia deben conectar variables como edad, sexo, estado civil, ocupación, estudios, convivencia, hijos, salud o riesgo cuando aplique.
@@ -135,9 +142,10 @@ REGLAS DE DEPENDENCIA:
 - Usar operadores: "igual", "diferente", "menor", "mayor"
 
 TENDENCIAS DE ESCALAS:
-- SOLO generar si la encuesta tiene preguntas de tipo escala_lineal, likert, nps, matriz o rating.
-- Si NO hay preguntas de escala → dejar como array vacío: []
-- Si SÍ hay escalas, generar 3-5 tendencias con distribuciones para CADA tamaño de escala encontrado:
+- Genera SIEMPRE entre 3 y 4 tendencias.
+- Si NO hay preguntas de escala, igual devuelve 3 tendencias genéricas reutilizables.
+  En ese caso pueden usar distribuciones estándar para tamaños "5", "7" y "11".
+- Si SÍ hay escalas, generar 3-4 tendencias con distribuciones para CADA tamaño de escala encontrado:
   {{
     "nombre": "Término Medio",
     "descripcion": "Responde en valores centrales",
@@ -161,7 +169,9 @@ TENDENCIAS DE ESCALAS:
 
 VALIDACIÓN FINAL:
 - Frecuencias de perfiles suman 100 ✓
+- Cantidad de perfiles entre 3 y 4 ✓
 - Frecuencias de tendencias suman 100 (si hay) ✓
+- Cantidad de tendencias entre 3 y 4 ✓
 - Cada "opciones" tiene probabilidades que suman 100 ✓
 - Solo tipos "fijo", "aleatorio" o "rango" ✓
 - Texto de preguntas copiado EXACTO del formulario ✓

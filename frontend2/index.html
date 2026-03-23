@@ -97,12 +97,13 @@
         <div class="card hidden" id="seccion3">
             <div class="flex-between">
                 <h2>3. Perfiles y configuracion</h2>
-                <div class="flex-gap">
+                <div class="flex-gap config-toolbar">
                     <select id="configSelector" class="config-select" onchange="cambiarConfig(this.value)"></select>
                     <button class="btn btn-outline btn-sm" onclick="exportConfig()">Exportar</button>
                     <button class="btn btn-outline btn-sm" onclick="importConfig()">Importar</button>
                 </div>
             </div>
+            <div id="configListSummary" class="config-list-summary mt-10"></div>
 
             <!-- Tabs -->
             <div class="config-tabs">

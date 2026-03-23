@@ -10,23 +10,35 @@ from app.automation.navigation.waits import (
 
 
 class FakeNode:
-    def __init__(self, visible=False):
+    def __init__(self, visible=False, text=""):
         self.visible = visible
+        self.text = text
 
     def is_visible(self, timeout=0):
         return self.visible
 
+    def inner_text(self, timeout=0):
+        return self.text
+
 
 class FakeLocator:
-    def __init__(self, count=0, visible=False):
+    def __init__(self, count=0, visible=False, items=None):
         self._count = count
         self._visible = visible
+        self._items = items or []
 
     def count(self):
-        return self._count
+        return len(self._items) if self._items else self._count
 
     def nth(self, idx):
+        if self._items:
+            return self._items[idx]
         return FakeNode(visible=self._visible)
+
+    def all(self):
+        if self._items:
+            return self._items
+        return [FakeNode(visible=self._visible) for _ in range(self._count)]
 
 
 class ReadyPage:
@@ -71,6 +83,31 @@ class SubmitPage:
         return FakeLocator(count=0, visible=False)
 
 
+class ValidationPage:
+    def __init__(self):
+        self.url = "https://docs.google.com/forms/d/e/test/viewform"
+        self._content_calls = 0
+
+    def content(self):
+        self._content_calls += 1
+        if self._content_calls >= 2:
+            return "<body>Esta pregunta es obligatoria</body>"
+        return "<body>before</body>"
+
+    def locator(self, selector):
+        if selector == '[role="listitem"]':
+            items = [
+                FakeNode(visible=True, text="Edad *\nElige"),
+                FakeNode(visible=True, text="Sexo *\nMasculino"),
+            ]
+            return FakeLocator(items=items)
+        if '[role="button"]' in selector or 'button:has-text' in selector or 'input[type="submit"]' in selector:
+            return FakeLocator(count=1, visible=True)
+        if 'input:not([type="hidden"])' in selector or '[role="listbox"]' in selector:
+            return FakeLocator(count=3, visible=True)
+        return FakeLocator(count=0, visible=False)
+
+
 class NavigationWaitsTest(unittest.TestCase):
     def test_wait_for_form_ready_uses_ready_selector(self):
         page = ReadyPage()
@@ -101,6 +138,17 @@ class NavigationWaitsTest(unittest.TestCase):
                 submit_clicked=True,
             )
         )
+
+    def test_wait_for_post_action_does_not_treat_validation_as_navigation(self):
+        page = ValidationPage()
+        before_state = capture_page_state(page, page.url)
+        changed = wait_for_post_action(
+            page,
+            before_state,
+            page.url,
+            {"timing": {"nav_wait_timeout_s": 0.08, "poll_interval_s": 0.01, "settle_pause_min": 0, "settle_pause_max": 0}},
+        )
+        self.assertFalse(changed)
 
 
 if __name__ == "__main__":

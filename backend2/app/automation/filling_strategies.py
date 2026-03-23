@@ -39,12 +39,8 @@ class FillingStrategies:
                 if el.is_visible(timeout=1500):
                     el.click()
                     pause_action(runtime_config, multiplier=0.8)
-                    el.fill("")
-                    el.fill(str(valor))
-                    # Disparar eventos que frameworks React/Fluent necesitan
-                    el.dispatch_event("input")
-                    el.dispatch_event("change")
-                    return True
+                    if FillingStrategies._fill_text_like_field(el, str(valor)):
+                        return True
             except Exception:
                 continue
         return False
@@ -63,11 +59,8 @@ class FillingStrategies:
                 if el.is_visible(timeout=1500):
                     el.click()
                     pause_action(runtime_config, multiplier=0.8)
-                    el.fill("")
-                    el.fill(str(valor))
-                    el.dispatch_event("input")
-                    el.dispatch_event("change")
-                    return True
+                    if FillingStrategies._fill_text_like_field(el, str(valor)):
+                        return True
             except Exception:
                 continue
         # Fallback a input de texto
@@ -151,6 +144,8 @@ class FillingStrategies:
                 el.scroll_into_view_if_needed()
                 el.click()
             pause_action(runtime_config, multiplier=0.9)
+            if FillingStrategies._requires_selected_validation(el):
+                return FillingStrategies._is_control_selected(el)
             return True
         except Exception:
             return False
@@ -530,19 +525,6 @@ class FillingStrategies:
                 except Exception:
                     pass
 
-        # Fallback random
-        if count > 0:
-            idx = random.randint(0, count - 1)
-            try:
-                if use_js_click:
-                    page.evaluate('el => el.click()', inputs.nth(idx).element_handle())
-                else:
-                    inputs.nth(idx).click(force=True)
-                pause_action(runtime_config, multiplier=0.7)
-                return True
-            except Exception:
-                pass
-
         return False
 
     # ========== RANKING ==========
@@ -642,3 +624,100 @@ class FillingStrategies:
             return FillingStrategies.fill_text(container, valor_str, runtime_config=runtime_config)
 
         return False
+
+    @staticmethod
+    def _fill_text_like_field(locator, valor: str) -> bool:
+        """Llena un campo de texto y verifica que el valor haya quedado persistido."""
+        expected = str(valor)
+        for action in (
+            lambda: FillingStrategies._fill_with_playwright(locator, expected),
+            lambda: FillingStrategies._fill_with_js(locator, expected),
+        ):
+            try:
+                action()
+                final_value = FillingStrategies._read_field_value(locator)
+                if FillingStrategies._field_value_matches(final_value, expected):
+                    return True
+            except Exception:
+                continue
+        return False
+
+    @staticmethod
+    def _fill_with_playwright(locator, valor: str) -> None:
+        locator.fill("")
+        locator.fill(valor)
+        locator.dispatch_event("input")
+        locator.dispatch_event("change")
+
+    @staticmethod
+    def _fill_with_js(locator, valor: str) -> None:
+        locator.evaluate(
+            """(el, value) => {
+                const text = String(value ?? "");
+                el.focus();
+                if (el.isContentEditable) {
+                    el.textContent = "";
+                    el.dispatchEvent(new InputEvent("input", {bubbles: true, data: ""}));
+                    el.textContent = text;
+                } else {
+                    el.value = "";
+                    el.dispatchEvent(new InputEvent("input", {bubbles: true, data: ""}));
+                    el.value = text;
+                }
+                el.dispatchEvent(new Event("input", {bubbles: true}));
+                el.dispatchEvent(new Event("change", {bubbles: true}));
+                el.dispatchEvent(new Event("blur", {bubbles: true}));
+            }""",
+            valor,
+        )
+
+    @staticmethod
+    def _read_field_value(locator) -> str:
+        try:
+            value = locator.evaluate(
+                """el => {
+                    if (el.isContentEditable) {
+                        return (el.textContent || "").trim();
+                    }
+                    if ("value" in el) {
+                        return (el.value || "").toString().trim();
+                    }
+                    return (el.textContent || "").trim();
+                }"""
+            )
+            return str(value or "").strip()
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _field_value_matches(actual: str, expected: str) -> bool:
+        actual = str(actual or "").strip()
+        expected = str(expected or "").strip()
+        if actual == expected:
+            return True
+        if actual.replace(" ", "") == expected.replace(" ", ""):
+            return True
+        actual_digits = "".join(ch for ch in actual if ch.isdigit())
+        expected_digits = "".join(ch for ch in expected if ch.isdigit())
+        if actual_digits and expected_digits and actual_digits == expected_digits:
+            return True
+        return False
+
+    @staticmethod
+    def _requires_selected_validation(locator) -> bool:
+        try:
+            input_type = (locator.get_attribute("type") or "").lower()
+            role = (locator.get_attribute("role") or "").lower()
+            return input_type in ("radio", "checkbox") or role in ("radio", "checkbox")
+        except Exception:
+            return False
+
+    @staticmethod
+    def _is_control_selected(locator) -> bool:
+        try:
+            aria_checked = (locator.get_attribute("aria-checked") or "").lower()
+            if aria_checked == "true":
+                return True
+            return bool(locator.evaluate("el => Boolean(el.checked)"))
+        except Exception:
+            return False

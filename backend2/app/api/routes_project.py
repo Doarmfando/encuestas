@@ -11,6 +11,69 @@ from app.database.connection import db
 from app.database.models import Project, ProjectConfig, Execution
 
 project_bp = Blueprint("project", __name__)
+MIN_PERFILES = 3
+MAX_PERFILES = 4
+MIN_TENDENCIAS = 3
+MAX_TENDENCIAS = 4
+
+
+def _validar_configuracion(perfiles, reglas, tendencias):
+    if len(perfiles) < MIN_PERFILES or len(perfiles) > MAX_PERFILES:
+        return jsonify({"error": "Se requieren entre 3 y 4 perfiles"}), 400
+    if len(tendencias) < MIN_TENDENCIAS or len(tendencias) > MAX_TENDENCIAS:
+        return jsonify({"error": "Se requieren entre 3 y 4 tendencias"}), 400
+    if len(reglas) < 1:
+        return jsonify({"error": "Se requiere mínimo 1 regla"}), 400
+    return None
+
+
+def _guardar_configuracion_proyecto(
+    project,
+    *,
+    nombre,
+    perfiles,
+    reglas,
+    tendencias,
+    ai_provider_used="",
+    replace_existing=False,
+    replace_config_id=None,
+):
+    existing_config = None
+    if replace_existing:
+        if replace_config_id:
+            existing_config = ProjectConfig.query.filter_by(
+                id=replace_config_id,
+                project_id=project.id,
+            ).first()
+        if not existing_config:
+            existing_config = project.get_active_config()
+
+    ProjectConfig.query.filter_by(project_id=project.id, is_active=True).update({"is_active": False})
+
+    if existing_config:
+        existing_config.nombre = nombre or existing_config.nombre or "Importado"
+        existing_config.perfiles = perfiles
+        existing_config.reglas_dependencia = reglas
+        existing_config.tendencias_escalas = tendencias
+        existing_config.ai_provider_used = ai_provider_used
+        existing_config.is_active = True
+        project.status = "configurado"
+        db.session.commit()
+        return existing_config, False
+
+    config = ProjectConfig(
+        project_id=project.id,
+        nombre=nombre,
+        perfiles=perfiles,
+        reglas_dependencia=reglas,
+        tendencias_escalas=tendencias,
+        ai_provider_used=ai_provider_used,
+        is_active=True,
+    )
+    db.session.add(config)
+    project.status = "configurado"
+    db.session.commit()
+    return config, True
 
 
 # ═══════════════ CRUD PROYECTOS ═══════════════
@@ -181,32 +244,22 @@ def aplicar_config_ia(project_id):
     tendencias = data.get("tendencias_escalas", [])
     nombre = data.get("nombre", "IA - " + datetime.now().strftime("%d/%m %H:%M"))
 
-    if len(perfiles) < 3:
-        return jsonify({"error": "Se requieren mínimo 3 perfiles"}), 400
-    if len(tendencias) < 3:
-        return jsonify({"error": "Se requieren mínimo 3 tendencias"}), 400
-    if len(reglas) < 1:
-        return jsonify({"error": "Se requiere mínimo 1 regla"}), 400
-
-    # Desactivar configs anteriores
-    ProjectConfig.query.filter_by(project_id=project.id, is_active=True).update({"is_active": False})
+    validation_error = _validar_configuracion(perfiles, reglas, tendencias)
+    if validation_error:
+        return validation_error
 
     ai_service = current_app.config.get("AI_SERVICE")
-    config = ProjectConfig(
-        project_id=project.id,
+    config, created = _guardar_configuracion_proyecto(
+        project,
         nombre=nombre,
         perfiles=perfiles,
-        reglas_dependencia=reglas,
-        tendencias_escalas=tendencias,
+        reglas=reglas,
+        tendencias=tendencias,
         ai_provider_used=ai_service.active_provider_name if ai_service else "",
-        is_active=True,
     )
-    db.session.add(config)
-    project.status = "configurado"
-    db.session.commit()
 
     result = config.to_dict()
-    return jsonify(result), 201
+    return jsonify(result), 201 if created else 200
 
 
 # ═══════════════ CONFIGS ═══════════════
@@ -214,7 +267,11 @@ def aplicar_config_ia(project_id):
 @project_bp.route("/projects/<int:project_id>/configs", methods=["GET"])
 def listar_configs(project_id):
     """Lista todas las configs de un proyecto."""
-    configs = ProjectConfig.query.filter_by(project_id=project_id).order_by(ProjectConfig.created_at.desc()).all()
+    configs = ProjectConfig.query.filter_by(project_id=project_id).order_by(
+        ProjectConfig.is_active.desc(),
+        ProjectConfig.updated_at.desc(),
+        ProjectConfig.created_at.desc(),
+    ).all()
     return jsonify([c.to_dict() for c in configs])
 
 
@@ -230,30 +287,22 @@ def crear_config(project_id):
     reglas = data.get("reglas_dependencia", [])
     tendencias = data.get("tendencias_escalas", [])
 
-    if len(perfiles) < 3:
-        return jsonify({"error": "Se requieren mínimo 3 perfiles"}), 400
-    if len(tendencias) < 3:
-        return jsonify({"error": "Se requieren mínimo 3 tendencias"}), 400
-    if len(reglas) < 1:
-        return jsonify({"error": "Se requiere mínimo 1 regla"}), 400
+    validation_error = _validar_configuracion(perfiles, reglas, tendencias)
+    if validation_error:
+        return validation_error
 
-    # Desactivar configs anteriores
-    ProjectConfig.query.filter_by(project_id=project.id, is_active=True).update({"is_active": False})
-
-    config = ProjectConfig(
-        project_id=project.id,
+    config, created = _guardar_configuracion_proyecto(
+        project,
         nombre=data.get("nombre", "Importado"),
         perfiles=perfiles,
-        reglas_dependencia=reglas,
-        tendencias_escalas=tendencias,
+        reglas=reglas,
+        tendencias=tendencias,
         ai_provider_used="importado",
-        is_active=True,
+        replace_existing=bool(data.get("replace_existing")),
+        replace_config_id=data.get("replace_config_id"),
     )
-    db.session.add(config)
-    project.status = "configurado"
-    db.session.commit()
 
-    return jsonify(config.to_dict()), 201
+    return jsonify(config.to_dict()), 201 if created else 200
 
 
 @project_bp.route("/projects/<int:project_id>/configs/<int:config_id>", methods=["PUT"])
@@ -266,16 +315,16 @@ def actualizar_config(project_id, config_id):
     data = request.json or {}
 
     if "perfiles" in data:
-        if len(data["perfiles"]) < 3:
-            return jsonify({"error": "Se requieren mínimo 3 perfiles"}), 400
+        if len(data["perfiles"]) < MIN_PERFILES or len(data["perfiles"]) > MAX_PERFILES:
+            return jsonify({"error": "Se requieren entre 3 y 4 perfiles"}), 400
         config.perfiles = data["perfiles"]
     if "reglas_dependencia" in data:
         if len(data["reglas_dependencia"]) < 1:
             return jsonify({"error": "Se requiere mínimo 1 regla"}), 400
         config.reglas_dependencia = data["reglas_dependencia"]
     if "tendencias_escalas" in data:
-        if len(data["tendencias_escalas"]) < 3:
-            return jsonify({"error": "Se requieren mínimo 3 tendencias"}), 400
+        if len(data["tendencias_escalas"]) < MIN_TENDENCIAS or len(data["tendencias_escalas"]) > MAX_TENDENCIAS:
+            return jsonify({"error": "Se requieren entre 3 y 4 tendencias"}), 400
         config.tendencias_escalas = data["tendencias_escalas"]
     if "nombre" in data:
         config.nombre = data["nombre"]

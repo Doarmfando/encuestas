@@ -55,5 +55,9 @@ def seed_prompts(db):
             )
             db.session.add(prompt)
             print(f"  [seed] Prompt '{slug}' creado")
+        elif existing.is_default:
+            existing.nombre = data["nombre"]
+            existing.descripcion = data["descripcion"]
+            existing.contenido = data["contenido"]
 
     db.session.commit()

@@ -18,6 +18,12 @@ INTERACTIVE_SELECTOR = (
     'input:not([type="hidden"]), textarea, select, [role="radio"], [role="checkbox"], '
     '[role="listbox"], [role="button"], button'
 )
+QUESTION_SELECTOR = '[role="listitem"]'
+VALIDATION_TEXTS = (
+    "esta pregunta es obligatoria",
+    "this is a required question",
+    "pregunta obligatoria",
+)
 
 
 def wait_for_form_ready(page, url: str = "", runtime_config: dict | None = None) -> bool:
@@ -48,12 +54,19 @@ def capture_page_state(page, url: str = "") -> dict:
     """Toma un snapshot liviano para detectar cambios de pagina o confirmacion."""
     platform = detectar_plataforma(url) if url else GENERIC
     content = _safe_page_content(page).lower()
+    question_titles = _extract_question_titles(page)
 
     return {
         "url": _safe_attr(lambda: page.url, ""),
         "interactive_count": _safe_count(page, INTERACTIVE_SELECTOR),
         "next_visible": _has_visible_button(page, platform.get("next_texts", [])),
         "submit_visible": _has_visible_button(page, platform.get("submit_texts", [])),
+        "question_signature": (
+            hashlib.md5("|".join(question_titles).encode("utf-8", errors="ignore")).hexdigest()
+            if question_titles else ""
+        ),
+        "question_count": len(question_titles),
+        "validation_visible": any(text in content for text in VALIDATION_TEXTS),
         "content_hash": hashlib.md5(content[:4000].encode("utf-8", errors="ignore")).hexdigest() if content else "",
     }
 
@@ -81,16 +94,37 @@ def wait_for_post_action(
         if current["url"] != baseline["url"]:
             pause_settle(runtime_config, multiplier=0.5)
             return True
-        if current["content_hash"] and current["content_hash"] != baseline["content_hash"]:
+        if (
+            current["question_signature"]
+            and baseline["question_signature"]
+            and current["question_signature"] != baseline["question_signature"]
+        ):
             pause_settle(runtime_config, multiplier=0.5)
             return True
-        if current["interactive_count"] != baseline["interactive_count"]:
+        if (
+            not current["question_signature"]
+            and not baseline["question_signature"]
+            and current["content_hash"]
+            and current["content_hash"] != baseline["content_hash"]
+        ):
             pause_settle(runtime_config, multiplier=0.5)
             return True
-        if current["next_visible"] != baseline["next_visible"]:
+        if (
+            current["interactive_count"] != baseline["interactive_count"]
+            and current["question_signature"] != baseline["question_signature"]
+        ):
             pause_settle(runtime_config, multiplier=0.5)
             return True
-        if current["submit_visible"] != baseline["submit_visible"]:
+        if (
+            current["next_visible"] != baseline["next_visible"]
+            and current["question_signature"] != baseline["question_signature"]
+        ):
+            pause_settle(runtime_config, multiplier=0.5)
+            return True
+        if (
+            current["submit_visible"] != baseline["submit_visible"]
+            and current["question_signature"] != baseline["question_signature"]
+        ):
             pause_settle(runtime_config, multiplier=0.5)
             return True
 
@@ -197,3 +231,35 @@ def _safe_attr(getter, default):
         return getter()
     except Exception:
         return default
+
+
+def _extract_question_titles(page, limit: int = 8) -> list[str]:
+    titles = []
+    try:
+        items = page.locator(QUESTION_SELECTOR).all()
+    except Exception:
+        return titles
+
+    for item in items:
+        if len(titles) >= limit:
+            break
+        try:
+            if hasattr(item, "is_visible") and not item.is_visible(timeout=100):
+                continue
+            title = _extract_question_title(item.inner_text(timeout=400))
+            if title:
+                titles.append(title)
+        except Exception:
+            continue
+    return titles
+
+
+def _extract_question_title(raw_text: str) -> str:
+    for line in str(raw_text or "").splitlines():
+        clean = " ".join(line.replace("*", " ").split()).strip()
+        if not clean:
+            continue
+        if clean.lower() in VALIDATION_TEXTS:
+            continue
+        return clean[:160]
+    return ""

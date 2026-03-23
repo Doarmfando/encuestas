@@ -56,6 +56,8 @@ class GoogleFormsFiller(BaseFiller):
             respuestas = pagina.get("respuestas", [])
             escalas_pendientes = []
             listitems = page.locator('[role="listitem"]').all()
+            page_failed = False
+            failed_questions = []
 
             for resp in respuestas:
                 tipo = resp["tipo"]
@@ -67,74 +69,101 @@ class GoogleFormsFiller(BaseFiller):
                     continue
 
                 container = self._find_question_container(page, pregunta, listitems, runtime_config=runtime_config)
+                filled = True
 
                 if tipo == "opcion_multiple":
                     print(f"    {pregunta[:50]}: {valor}")
                     if str(valor).startswith("Otro"):
-                        self._click_otro(page, valor, "radio", container, pregunta=pregunta, runtime_config=runtime_config)
+                        filled = self._click_otro(
+                            page, valor, "radio", container, pregunta=pregunta, runtime_config=runtime_config
+                        )
                     else:
-                        self._click_opcion(page, valor, "radio", container, pregunta=pregunta, runtime_config=runtime_config)
+                        filled = self._click_opcion(
+                            page, valor, "radio", container, pregunta=pregunta, runtime_config=runtime_config
+                        )
                     pause_action(runtime_config)
 
                 elif tipo == "seleccion_multiple":
                     print(f"    {pregunta[:50]}: {valor}")
                     valores = valor if isinstance(valor, list) else [valor]
+                    filled = True
                     for item_val in valores:
                         if str(item_val).startswith("Otro"):
-                            self._click_otro(
+                            current = self._click_otro(
                                 page, item_val, "checkbox", container, pregunta=pregunta, runtime_config=runtime_config
                             )
                         else:
-                            self._click_opcion(
+                            current = self._click_opcion(
                                 page, item_val, "checkbox", container, pregunta=pregunta, runtime_config=runtime_config
                             )
+                        filled = filled and current
                         pause_action(runtime_config, multiplier=0.7)
 
                 elif tipo == "parrafo":
                     print(f"    {pregunta[:50]}: {str(valor)[:50]}...")
-                    self._escribir_parrafo(page, valor, container)
+                    filled = self._escribir_parrafo(page, valor, container)
                     pause_action(runtime_config)
 
                 elif tipo in ("texto", "numero"):
                     print(f"    {pregunta[:50]}: {valor}")
-                    self._escribir_texto(page, valor, container, pregunta=pregunta, tipo=tipo)
+                    filled = self._escribir_texto(page, valor, container, pregunta=pregunta, tipo=tipo)
                     pause_action(runtime_config)
 
                 elif tipo == "escala_lineal":
                     escalas_pendientes.append((valor, container))
+                    filled = True
 
                 elif tipo == "desplegable":
                     print(f"    {pregunta[:50]}: {valor}")
-                    self._seleccionar_dropdown(page, pregunta, valor, container, runtime_config=runtime_config)
+                    filled = self._seleccionar_dropdown(page, pregunta, valor, container, runtime_config=runtime_config)
                     pause_action(runtime_config)
 
                 elif tipo == "fecha":
                     print(f"    {pregunta[:50]}: {valor}")
-                    self._llenar_fecha_gforms(page, valor, container, runtime_config=runtime_config)
+                    filled = self._llenar_fecha_gforms(page, valor, container, runtime_config=runtime_config)
                     pause_action(runtime_config)
 
                 elif tipo == "hora":
                     print(f"    {pregunta[:50]}: {valor}")
-                    self._llenar_hora_gforms(page, valor, container, runtime_config=runtime_config)
+                    filled = self._llenar_hora_gforms(page, valor, container, runtime_config=runtime_config)
                     pause_action(runtime_config)
 
                 elif tipo in ("matriz", "matriz_checkbox"):
                     print(f"    {pregunta[:50]}: (matriz)")
-                    self._llenar_matriz_gforms(page, valor, tipo, container, runtime_config=runtime_config)
+                    filled = self._llenar_matriz_gforms(page, valor, tipo, container, runtime_config=runtime_config)
                     pause_action(runtime_config)
 
                 else:
                     print(f"    {pregunta[:50]} ({tipo}): {valor}")
-                    self._escribir_texto(page, valor, container, pregunta=pregunta, tipo=tipo)
+                    filled = self._escribir_texto(page, valor, container, pregunta=pregunta, tipo=tipo)
                     pause_action(runtime_config)
+
+                if not filled:
+                    page_failed = True
+                    failed_questions.append(pregunta)
+                    print(f"      No se pudo completar: {pregunta[:60]}")
 
             if escalas_pendientes:
                 print(f"    Respondiendo {len(escalas_pendientes)} escalas...")
-                self._responder_escalas_scoped(page, escalas_pendientes, runtime_config=runtime_config)
+                respondidas = self._responder_escalas_scoped(page, escalas_pendientes, runtime_config=runtime_config)
+                if respondidas < len(escalas_pendientes):
+                    page_failed = True
+                    missing = len(escalas_pendientes) - respondidas
+                    failed_questions.append(f"Escalas pendientes ({missing})")
+
+            if page_failed:
+                preview = "; ".join(q[:50] for q in failed_questions[:4])
+                print(f"    [Google] Abortando pagina: {len(failed_questions)} respuesta(s) no se llenaron")
+                if preview:
+                    print(f"    [Google] Fallidas: {preview}")
+                break
 
             botones = pagina.get("botones", [])
             if "Siguiente" in botones:
-                click_boton(page, "Siguiente", url, runtime_config=runtime_config)
+                advanced = click_boton(page, "Siguiente", url, runtime_config=runtime_config)
+                if not advanced:
+                    print("    [Google] No se pudo avanzar de pagina. Posible pregunta obligatoria sin responder.")
+                    break
             elif "Enviar" in botones:
                 submit_clicked = click_boton(page, "Enviar", url, runtime_config=runtime_config)
 
@@ -583,29 +612,233 @@ class GoogleFormsFiller(BaseFiller):
         """Dropdown de Google Forms (custom role=listbox)."""
         scope = container if container else page
         self._prepare_scope(scope)
-        try:
-            for lb in scope.locator('[role="listbox"]').all():
-                if lb.is_visible():
-                    lb.click()
-                    pause_action(runtime_config, multiplier=1.0)
-                    option = page.locator(f'[role="option"]:has-text("{valor}")').first
-                    if option.is_visible(timeout=2000):
-                        option.click()
-                        return True
-                    page.keyboard.press("Escape")
-                    pause_action(runtime_config, multiplier=0.8)
+        target = self._normalize_match_text(valor)
 
-            if container:
+        dropdowns = []
+        try:
+            dropdowns.extend(scope.locator('[role="listbox"]').all())
+        except Exception:
+            pass
+
+        if container and not dropdowns:
+            try:
                 dropdown = page.locator(f'[role="listbox"]:near(:text("{pregunta[:40]}"))').first
-                if dropdown.is_visible(timeout=2000):
-                    dropdown.click()
-                    pause_action(runtime_config, multiplier=1.0)
-                    option = page.locator(f'[role="option"]:has-text("{valor}")').first
-                    if option.is_visible(timeout=2000):
-                        option.click()
-                        return True
-                    page.keyboard.press("Escape")
+                if dropdown and dropdown.is_visible(timeout=400):
+                    dropdowns.append(dropdown)
+            except Exception:
+                pass
+
+        tried = set()
+        for lb in dropdowns:
+            if id(lb) in tried:
+                continue
+            tried.add(id(lb))
+
+            try:
+                if not lb.is_visible(timeout=500):
+                    continue
+            except Exception:
+                continue
+
+            if self._dropdown_has_value(page, lb, target):
+                return True
+
+            if not self._open_dropdown(page, lb):
+                continue
+
+            pause_action(runtime_config, multiplier=1.0)
+            if self._click_dropdown_option(page, lb, target, runtime_config=runtime_config):
+                pause_action(runtime_config, multiplier=0.8)
+                if self._dropdown_has_value(page, lb, target):
+                    return True
+                if container:
+                    try:
+                        for refreshed in container.locator('[role="listbox"]').all():
+                            if self._dropdown_has_value(page, refreshed, target):
+                                return True
+                    except Exception:
+                        pass
+
+            try:
+                page.keyboard.press("Escape")
+                pause_action(runtime_config, multiplier=0.6)
+            except Exception:
+                pass
+
+        return False
+
+    def _open_dropdown(self, page, listbox) -> bool:
+        for action in (
+            lambda: listbox.click(),
+            lambda: listbox.click(force=True),
+            lambda: listbox.evaluate(
+                """el => {
+                    el.scrollIntoView({block: "center", inline: "nearest"});
+                    el.click();
+                }"""
+            ),
+        ):
+            try:
+                listbox.scroll_into_view_if_needed()
+            except Exception:
+                pass
+            try:
+                action()
+                expanded = (listbox.get_attribute("aria-expanded") or "").lower()
+                if expanded == "true" or self._visible_dropdown_options(page):
+                    return True
+            except Exception:
+                continue
+        return False
+
+    def _click_dropdown_option(self, page, listbox, target: str, runtime_config: dict | None = None) -> bool:
+        matches = []
+        try:
+            options = page.locator('[role="option"]').all()
+        except Exception:
             return False
+
+        for option in options:
+            try:
+                if hasattr(option, "is_visible") and not option.is_visible(timeout=200):
+                    continue
+                text = option.inner_text(timeout=300).strip()
+            except Exception:
+                continue
+
+            score = self._score_option_candidate([text], target)
+            if score > 0:
+                matches.append((score, option))
+
+        matches.sort(key=lambda item: item[0], reverse=True)
+        for _, option in matches:
+            try:
+                option.scroll_into_view_if_needed()
+            except Exception:
+                pass
+
+            for action, confirm_with_enter in (
+                (lambda: option.click(), False),
+                (lambda: option.click(force=True), False),
+                (lambda: option.evaluate(
+                    """el => {
+                        el.scrollIntoView({block: "center", inline: "nearest"});
+                        el.click();
+                    }"""
+                ), False),
+                (lambda: option.focus(), True),
+                (lambda: option.hover(), True),
+            ):
+                try:
+                    action()
+                    if confirm_with_enter:
+                        page.keyboard.press("Enter")
+                    pause_action(runtime_config, multiplier=0.6)
+                    if self._dropdown_has_value(page, listbox, target):
+                        return True
+                except Exception:
+                    continue
+
+        if matches and self._select_dropdown_option_with_keyboard(page, listbox, matches, target, runtime_config):
+            return True
+        return False
+
+    def _dropdown_has_value(self, page, listbox, target: str) -> bool:
+        try:
+            values = listbox.evaluate(
+                """el => {
+                    const out = [];
+                    const add = (value) => {
+                        const text = (value || '').toString().trim();
+                        if (text && !out.includes(text)) out.push(text);
+                    };
+                    add(el.getAttribute && el.getAttribute('aria-label'));
+                    add(el.getAttribute && el.getAttribute('data-value'));
+                    add((el.innerText || el.textContent || '').split('\n')[0]);
+                    return out.slice(0, 8);
+                }"""
+            )
+        except Exception:
+            values = []
+
+        try:
+            selected_options = page.locator('[role="option"][aria-selected="true"], [role="option"][aria-checked="true"]').all()
+            for option in selected_options:
+                try:
+                    values.append(option.inner_text(timeout=200).strip())
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+        placeholder_tokens = {"elige", "choose", "select"}
+        for value in values if isinstance(values, list) else []:
+            normalized = self._normalize_match_text(value)
+            if not normalized or normalized in placeholder_tokens:
+                continue
+            if normalized == target:
+                return True
+        return False
+
+    @staticmethod
+    def _visible_dropdown_options(page) -> int:
+        try:
+            options = page.locator('[role="option"]').all()
+        except Exception:
+            return 0
+
+        visible = 0
+        for option in options:
+            try:
+                if hasattr(option, "is_visible") and option.is_visible(timeout=150):
+                    visible += 1
+            except Exception:
+                continue
+        return visible
+
+    def _select_dropdown_option_with_keyboard(
+        self,
+        page,
+        listbox,
+        matches,
+        target: str,
+        runtime_config: dict | None = None,
+    ) -> bool:
+        try:
+            visible_options = []
+            for option in page.locator('[role="option"]').all():
+                try:
+                    if hasattr(option, "is_visible") and not option.is_visible(timeout=150):
+                        continue
+                    visible_options.append(option)
+                except Exception:
+                    continue
+
+            if not visible_options:
+                return False
+
+            best_option = matches[0][1]
+            target_idx = None
+            for idx, option in enumerate(visible_options):
+                if option == best_option:
+                    target_idx = idx
+                    break
+            if target_idx is None:
+                return False
+
+            try:
+                listbox.focus()
+            except Exception:
+                listbox.click(force=True)
+
+            page.keyboard.press("Home")
+            pause_action(runtime_config, multiplier=0.4)
+            for _ in range(target_idx):
+                page.keyboard.press("ArrowDown")
+                pause_action(runtime_config, multiplier=0.25)
+            page.keyboard.press("Enter")
+            pause_action(runtime_config, multiplier=0.6)
+            return self._dropdown_has_value(page, listbox, target)
         except Exception:
             return False
 
@@ -709,9 +942,6 @@ class GoogleFormsFiller(BaseFiller):
             if 0 <= idx < len(controls):
                 controls[idx].click()
                 return True
-        if controls:
-            random.choice(controls).click()
-            return True
         return False
 
     def _responder_escalas_scoped(
@@ -753,11 +983,9 @@ class GoogleFormsFiller(BaseFiller):
                         radios[target_idx].click()
                         seleccionado = True
 
-                if not seleccionado and radios:
-                    radios[random.randint(0, len(radios) - 1)].click()
-
-                respondidas += 1
-                pause_action(runtime_config, multiplier=0.8)
+                if seleccionado:
+                    respondidas += 1
+                    pause_action(runtime_config, multiplier=0.8)
             except Exception:
                 continue
 

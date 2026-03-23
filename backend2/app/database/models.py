@@ -99,9 +99,13 @@ class ProjectConfig(db.Model):
             "perfiles": self.perfiles,
             "reglas_dependencia": self.reglas_dependencia,
             "tendencias_escalas": self.tendencias_escalas,
+            "total_perfiles": len(self.perfiles or []),
+            "total_reglas": len(self.reglas_dependencia or []),
+            "total_tendencias": len(self.tendencias_escalas or []),
             "ai_provider_used": self.ai_provider_used,
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
     def to_configuracion(self):
