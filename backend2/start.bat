@@ -1,0 +1,6 @@
+@echo off
+echo Activando entorno virtual...
+call venv\Scripts\activate
+echo Iniciando servidor...
+python server_new.py
+pause
