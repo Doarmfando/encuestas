@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Encuestas</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="app">
+    <!-- Header -->
+    <div class="app-header">
+        <div class="header-left">
+            <h1 id="headerTitle">Sistema de Encuestas</h1>
+            <p class="subtitle" id="headerSubtitle">Gestiona tus proyectos de encuestas con IA</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-outline btn-sm" id="btnDashboard" onclick="showDashboard()">Dashboard</button>
+            <button class="btn btn-outline btn-sm" onclick="togglePanel('settings')">Config</button>
+            <button class="btn btn-outline btn-sm" id="btnVolverProyectos" onclick="volverAProyectos()" style="display:none">Volver</button>
+        </div>
+    </div>
+
+    <!-- ════════════ VISTA: LISTA DE PROYECTOS ════════════ -->
+    <div id="vistaProyectos">
+        <div class="projects-header">
+            <h2>Mis Proyectos</h2>
+            <button class="btn btn-primary" onclick="mostrarCrearProyecto()">+ Nuevo Proyecto</button>
+        </div>
+
+        <!-- Crear proyecto (inline) -->
+        <div class="card hidden" id="formCrearProyecto">
+            <h3>Crear nuevo proyecto</h3>
+            <div class="form-group">
+                <label>Nombre del proyecto</label>
+                <input type="text" id="nuevoNombre" placeholder="Ej: Encuesta Integridad Policial">
+            </div>
+            <div class="form-group">
+                <label>URL del formulario</label>
+                <input type="url" id="nuevaUrl" placeholder="https://forms.gle/...">
+            </div>
+            <div class="form-group">
+                <label>Descripcion (opcional)</label>
+                <input type="text" id="nuevaDesc" placeholder="Descripcion breve">
+            </div>
+            <div class="flex-gap">
+                <button class="btn btn-primary" onclick="crearProyecto()">Crear</button>
+                <button class="btn btn-outline" onclick="hideEl('formCrearProyecto')">Cancelar</button>
+            </div>
+        </div>
+
+        <!-- Lista de proyectos -->
+        <div id="projectsList" class="projects-grid">
+            <div class="empty-state">Cargando proyectos...</div>
+        </div>
+    </div>
+
+    <!-- ════════════ VISTA: DETALLE DEL PROYECTO ════════════ -->
+    <div id="vistaProyecto" style="display:none">
+        <!-- Steps indicator -->
+        <div class="steps">
+            <div class="step active" id="step1"><span class="num">1</span>Scrapear</div>
+            <div class="step" id="step2"><span class="num">2</span>Analizar</div>
+            <div class="step" id="step3"><span class="num">3</span>Configurar</div>
+            <div class="step" id="step4"><span class="num">4</span>Ejecutar</div>
+        </div>
+
+        <!-- PASO 1: Scraping -->
+        <div class="card" id="seccion1">
+            <div class="flex-between">
+                <h2>1. Scrapear formulario</h2>
+                <span class="platform-badge hidden" id="platformBadge"></span>
+            </div>
+            <p class="hint">URL: <strong id="projectUrl"></strong></p>
+            <div class="input-options mt-10">
+                <label><input type="checkbox" id="scrapeHeadless" checked> Modo invisible</label>
+                <label><input type="checkbox" id="scrapeManual"> Modo manual</label>
+                <label class="scrape-platform-label">
+                    Plataforma:
+                    <select id="scrapePlatform">
+                        <option value="auto" selected>Auto (detectar por URL)</option>
+                        <option value="google_forms">Google Forms</option>
+                        <option value="microsoft_forms">Microsoft Forms</option>
+                    </select>
+                </label>
+                <button class="btn btn-primary" id="btnScrape" onclick="scrapeProject()">Scrapear</button>
+                <button class="btn btn-outline" id="btnScrapeMsForms" onclick="scrapeProject('microsoft_forms')" title="Fuerza el scraper de MS Forms ignorando la URL">Scrapear como Microsoft Forms</button>
+            </div>
+            <div id="scrapeError" class="alert alert-error hidden mt-10"></div>
+        </div>
+
+        <!-- PASO 2: Estructura detectada -->
+        <div class="card hidden" id="seccion2">
+            <div class="flex-between">
+                <h2>2. Estructura detectada</h2>
+                <div class="flex-gap">
+                    <button class="btn btn-outline btn-sm" onclick="togglePreguntas()">Ver/Ocultar</button>
+                    <button class="btn btn-outline btn-sm" onclick="importConfigDirect()">Importar JSON</button>
+                    <button class="btn btn-outline btn-sm" onclick="generarPlantilla()">Plantilla sin IA</button>
+                    <button class="btn btn-primary btn-sm" id="btnAnalizar" onclick="analizarConIA()">Analizar con IA</button>
+                </div>
+            </div>
+            <div id="infoForm" class="alert alert-info mt-10"></div>
+            <div class="config-tabs manual-tabs">
+                <button class="tab active" onclick="showManualTab('detected', this)">Detectada</button>
+                <button class="tab" onclick="showManualTab('form', this)">Manual - Formulario</button>
+                <button class="tab" onclick="showManualTab('json', this)">Manual - JSON</button>
+            </div>
+            <div id="manualTabDetected" class="manual-tab-content">
+                <div id="preguntasList" class="mt-10"></div>
+            </div>
+            <div id="manualTabForm" class="manual-tab-content hidden">
+                <div class="manual-toolbar">
+                    <button class="btn btn-outline btn-sm" onclick="cargarManualDesdeDetectada()">Cargar detectada</button>
+                    <button class="btn btn-outline btn-sm" onclick="agregarManualPagina()">+ Pagina</button>
+                    <button class="btn btn-primary btn-sm" onclick="guardarManualEstructura()">Guardar estructura manual</button>
+                </div>
+                <div id="manualFormContainer" class="mt-10"></div>
+            </div>
+            <div id="manualTabJson" class="manual-tab-content hidden">
+                <div class="manual-toolbar">
+                    <button class="btn btn-outline btn-sm" onclick="cargarManualJson()">Cargar detectada</button>
+                    <button class="btn btn-primary btn-sm" onclick="guardarManualJson()">Guardar estructura manual</button>
+                </div>
+                <textarea id="manualJsonEditor" class="code-input" rows="14"
+                    placeholder="{\n  &quot;paginas&quot;: [\n    {\n      &quot;numero&quot;: 1,\n      &quot;botones&quot;: [&quot;Siguiente&quot;],\n      &quot;preguntas&quot;: []\n    }\n  ]\n}"></textarea>
+            </div>
+        </div>
+
+        <!-- PASO 3: Configuracion -->
+        <div class="card hidden" id="seccion3">
+            <div class="flex-between">
+                <h2>3. Perfiles y configuracion</h2>
+                <div class="flex-gap config-toolbar">
+                    <select id="configSelector" class="config-select" onchange="cambiarConfig(this.value)"></select>
+                    <button class="btn btn-outline btn-sm" onclick="exportConfig()">Exportar</button>
+                    <button class="btn btn-outline btn-sm" onclick="importConfig()">Importar</button>
+                </div>
+            </div>
+            <div id="configListSummary" class="config-list-summary mt-10"></div>
+
+            <!-- Tabs -->
+            <div class="config-tabs">
+                <button class="tab active" onclick="showConfigTab('perfiles', this)">Perfiles</button>
+                <button class="tab" onclick="showConfigTab('tendencias', this)">Tendencias</button>
+                <button class="tab" onclick="showConfigTab('reglas', this)">Reglas</button>
+            </div>
+
+            <!-- Tab: Perfiles -->
+            <div class="config-tab-content" id="tabPerfiles">
+                <div class="section-help">
+                    Cada perfil representa un tipo de persona. La frecuencia indica que % de las respuestas usara ese perfil.
+                    <strong>Minimo 3 perfiles.</strong>
+                </div>
+                <div id="perfilesList"></div>
+                <button class="btn btn-sm btn-primary mt-10" onclick="agregarPerfil()">+ Agregar perfil</button>
+            </div>
+
+            <!-- Tab: Tendencias -->
+            <div class="config-tab-content hidden" id="tabTendencias">
+                <div class="section-help purple">
+                    Las tendencias definen como responde cada tipo en las preguntas de escala (Likert 1-5).
+                    <strong>Minimo 3 tendencias.</strong>
+                </div>
+                <div id="tendenciasList"></div>
+                <button class="btn btn-sm btn-primary mt-10" onclick="agregarTendencia()">+ Agregar tendencia</button>
+            </div>
+
+            <!-- Tab: Reglas -->
+            <div class="config-tab-content hidden" id="tabReglas">
+                <div class="section-help warning">
+                    Las reglas permiten que una respuesta dependa de otra.
+                    <strong>Opcional (0 o más).</strong>
+                </div>
+                <div id="reglasList"></div>
+                <button class="btn btn-sm btn-primary mt-10" onclick="agregarRegla()">+ Agregar regla</button>
+            </div>
+        </div>
+
+        <!-- PASO 4: Ejecutar -->
+        <div class="card hidden" id="seccion4">
+            <h2>4. Ejecutar bot</h2>
+            <div class="exec-controls">
+                <div class="exec-field">
+                    <label>Cantidad</label>
+                    <input type="number" id="cantidadInput" value="10" min="1" max="500">
+                </div>
+                <div class="exec-field">
+                    <label>Velocidad</label>
+                    <select id="speedProfileInput">
+                        <option value="balanced" selected>Rapido balanceado</option>
+                        <option value="fast">Maxima velocidad</option>
+                        <option value="turbo">Turbo</option>
+                        <option value="turbo_plus">Turbo+</option>
+                        <option value="safe">Disimulado</option>
+                    </select>
+                </div>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="headlessInput" checked>
+                    Modo invisible
+                </label>
+                <button class="btn btn-success" id="btnEjecutar" onclick="ejecutar()">Ejecutar</button>
+                <button class="btn btn-primary" id="btnEjecutarTurboPlus" onclick="ejecutarTurboPlus()">Turbo+</button>
+                <button class="btn btn-outline hidden" id="btnReejecutar" onclick="ejecutar()">Ejecutar de nuevo</button>
+                <button class="btn btn-danger hidden" id="btnDetener" onclick="detener()">Detener</button>
+            </div>
+
+            <div id="progressSection" class="hidden mt-20">
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="progressBar" style="width:0%">0%</div>
+                </div>
+                <div class="stats">
+                    <div class="stat ok"><div class="num" id="stExitosas">0</div><div class="lbl">Exitosas</div></div>
+                    <div class="stat fail"><div class="num" id="stFallidas">0</div><div class="lbl">Fallidas</div></div>
+                    <div class="stat prog"><div class="num" id="stProgreso">0/0</div><div class="lbl">Progreso</div></div>
+                    <div class="stat time"><div class="num" id="stTiempo">0s</div><div class="lbl">Total</div></div>
+                    <div class="stat avg"><div class="num" id="stPromedio">0s</div><div class="lbl">Promedio</div></div>
+                </div>
+                <div class="mensaje" id="stMensaje"></div>
+                <button class="btn btn-success hidden mt-10" id="btnExcel" onclick="descargar()" style="width:100%">
+                    Descargar Excel
+                </button>
+            </div>
+
+            <div class="console-section mt-20">
+                <div class="flex-between">
+                    <h3 style="margin:0;font-size:14px">Consola</h3>
+                    <button class="btn btn-outline btn-sm" onclick="clearConsole()">Limpiar</button>
+                </div>
+                <pre class="console-output" id="consoleOutput">Esperando ejecucion...</pre>
+            </div>
+
+            <!-- Historial de ejecuciones del proyecto -->
+            <div class="mt-20">
+                <h3 style="font-size:14px">Historial de ejecuciones</h3>
+                <div id="projectExecHistory"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════ VISTA: DASHBOARD ════════════ -->
+    <div id="vistaDashboard" style="display:none">
+        <div class="flex-between mb-15">
+            <h2>Dashboard - Ejecuciones activas</h2>
+            <button class="btn btn-outline btn-sm" onclick="volverAProyectos()">Volver</button>
+        </div>
+        <div id="dashboardContent">
+            <div class="empty-state">Cargando...</div>
+        </div>
+    </div>
+
+    <!-- Panel lateral: Settings -->
+    <div class="side-panel hidden" id="panelSettings">
+        <div class="panel-header">
+            <h3>Configuracion</h3>
+            <button class="btn-close" onclick="togglePanel('settings')">&times;</button>
+        </div>
+        <div class="panel-body">
+            <div class="form-group">
+                <label>Proveedor de IA</label>
+                <div id="providerList" class="provider-list"></div>
+            </div>
+            <div class="form-group">
+                <label>Agregar proveedor</label>
+                <select id="newProviderName">
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                </select>
+                <input type="password" id="newProviderKey" placeholder="API Key" class="mt-5">
+                <input type="text" id="newProviderModel" placeholder="Modelo (opcional)" class="mt-5">
+                <button class="btn btn-primary btn-sm mt-5" onclick="addProvider()">Agregar</button>
+            </div>
+            <hr class="divider">
+            <div id="settingsInfo"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal genérico -->
+<div class="modal-overlay hidden" id="modalOverlay" onclick="cerrarModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-head">
+            <h2 id="modalTitulo">Editar</h2>
+            <button class="btn-close" onclick="cerrarModalBtn()">&times;</button>
+        </div>
+        <div id="modalContenido"></div>
+        <div class="modal-actions" id="modalActions">
+            <button class="btn btn-danger btn-sm" onclick="cerrarModalBtn()">Cancelar</button>
+            <button class="btn btn-primary btn-sm" onclick="guardarModal()">Guardar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal IA Preview (especial) -->
+<div class="modal-overlay hidden" id="iaPreviewOverlay" onclick="cerrarIAPreview(event)">
+    <div class="modal modal-lg" onclick="event.stopPropagation()">
+        <div class="modal-head">
+            <h2>Preview - Configuracion generada por IA</h2>
+            <button class="btn-close" onclick="cerrarIAPreviewBtn()">&times;</button>
+        </div>
+        <div id="iaPreviewContent"></div>
+        <div class="modal-actions">
+            <button class="btn btn-danger btn-sm" onclick="cerrarIAPreviewBtn()">Descartar</button>
+            <button class="btn btn-primary btn-sm" onclick="aplicarConfigIA()">Aplicar configuracion</button>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden file inputs -->
+<input type="file" id="fileImport" accept=".json" style="display:none" onchange="handleImport(event)">
+<input type="file" id="fileImportDirect" accept=".json" style="display:none" onchange="handleImportDirect(event)">
+
+<!-- JS -->
+<script src="js/api.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/modal.js"></script>
+<script src="js/config.js"></script>
+<script src="js/ejecutar.js"></script>
+<script src="js/panels.js"></script>
+<script src="js/prompts.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
