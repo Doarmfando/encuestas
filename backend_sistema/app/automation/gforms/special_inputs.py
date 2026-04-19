@@ -123,14 +123,20 @@ class SpecialInputHandler:
                 'div[class*="ssX1Bd"]:has([role="radio"]), '
                 'div[class*="ssX1Bd"]:has([role="checkbox"])')
 
-        def _get(el, attr):
+        _IS_HIDDEN_JS = (
+            "el => { let p = el; while (p) {"
+            " if (p.getAttribute && p.getAttribute('aria-hidden') === 'true') return true;"
+            " p = p.parentElement; } return false; }"
+        )
+
+        def _is_hidden(el):
             try:
-                return el.get_attribute(attr)
+                return bool(el.evaluate(_IS_HIDDEN_JS))
             except Exception:
-                return None
+                return False
 
         def _filter_hidden(candidates):
-            visible = [r for r in candidates if _get(r, "aria-hidden") != "true"]
+            visible = [r for r in candidates if not _is_hidden(r)]
             return visible or candidates
 
         # Estrategia 1: buscar en el scope dado
@@ -245,12 +251,22 @@ class SpecialInputHandler:
 
     @staticmethod
     def _find_col_headers(scope) -> list:
-        """Extrae los textos de columna del encabezado de la matriz desde el DOM."""
+        """Extrae los textos de columna del encabezado visible de la matriz."""
         try:
             result = scope.evaluate(
                 """el => {
+                    const isHidden = node => {
+                        let p = node;
+                        while (p) {
+                            if (p.getAttribute && p.getAttribute('aria-hidden') === 'true') return true;
+                            p = p.parentElement;
+                        }
+                        return false;
+                    };
                     const rows = Array.from(el.querySelectorAll('div[class*="ssX1Bd"]'));
-                    const header = rows.find(r => !r.querySelector('[role="radio"],[role="checkbox"]'));
+                    const header = rows.find(r =>
+                        !r.querySelector('[role="radio"],[role="checkbox"]') && !isHidden(r)
+                    );
                     if (!header) return [];
                     return Array.from(header.children)
                         .map(c => (c.innerText || '').trim())

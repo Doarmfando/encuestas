@@ -155,6 +155,8 @@ class ResponseGenerator:
         if pregunta_tipo in ("matriz", "matriz_checkbox", "likert") and pregunta:
             filas = pregunta.get("filas", [])
             if filas:
+                if tipo == "grupos_fila":
+                    return self._generar_matriz_grupos(config, filas, pregunta_tipo)
                 resultado = {}
                 for fila in filas:
                     if tipo == "aleatorio":
@@ -170,6 +172,41 @@ class ResponseGenerator:
                 return resultado
 
         return valor_base
+
+    def _generar_matriz_grupos(self, config: dict, filas: list, pregunta_tipo: str) -> dict:
+        """Genera respuestas de matriz con distribuciones distintas por grupo de fila."""
+        grupos = config.get("grupos", [])
+        resultado = {}
+
+        fila_a_grupo: dict = {}
+        for grupo in grupos:
+            for fila in grupo.get("filas", []):
+                fila_norm = normalize_for_matching(fila)
+                fila_a_grupo[fila_norm] = grupo
+
+        for fila in filas:
+            fila_norm = normalize_for_matching(fila)
+            grupo = fila_a_grupo.get(fila_norm)
+
+            if grupo is None:
+                for key_norm, g in fila_a_grupo.items():
+                    if fila_norm in key_norm or key_norm in fila_norm:
+                        grupo = g
+                        break
+
+            if grupo:
+                opciones_cfg = grupo.get("opciones", {})
+                if opciones_cfg:
+                    items, pesos = list(opciones_cfg.keys()), list(opciones_cfg.values())
+                    val = random.choices(items, weights=pesos)[0]
+                else:
+                    val = ""
+            else:
+                val = ""
+
+            resultado[fila] = [val] if pregunta_tipo == "matriz_checkbox" else val
+
+        return resultado
 
     def _generar_multiple(self, config: dict, opciones_disponibles: list) -> list:
         patrones = config.get("patrones", [])

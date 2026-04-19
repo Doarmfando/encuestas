@@ -1,0 +1,383 @@
+{
+  "nombre": "Valle Verde 1 - Grupos por fila (Negativo, Positivo, Neutro)",
+  "perfiles": [
+    {
+      "nombre": "Perfil Negativo",
+      "descripcion": "Percibe el servicio eléctrico de forma negativa: problemas frecuentes, inestabilidad y poca confianza en la infraestructura.",
+      "frecuencia": 40,
+      "tendencia_sugerida": "Tendencia Negativa",
+      "respuestas": {
+        "Sexo": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Masculino": 50,
+            "Femenino": 50
+          }
+        },
+        "Sección 1: Estabilidad y Calidad del Voltaje": {
+          "tipo": "grupos_fila",
+          "grupos": [
+            {
+              "nombre": "negativa",
+              "filas": [
+                "Noto que las luces de la casa parpadean o cambian de intensidad de repente.",
+                "Se me han quemado bombillos o aparatos debido a subidas de voltaje (el \"alto voltaje\").",
+                "El aire acondicionado o la nevera hacen un ruido extraño cuando arranca el motor.",
+                "Siento que la energía que llega a mi casa es inestable durante las horas de mucho calor.",
+                "Los equipos electrónicos (PC, TV) se reinician solos sin que se vaya la luz por completo.",
+                "He tenido que comprar protectores de voltaje para todos mis electrodomésticos.",
+                "Noto que los abanicos giran más lento de lo normal en ciertos momentos del día.",
+                "He reportado a la compañía eléctrica problemas con el voltaje en mi calle."
+              ],
+              "opciones": {
+                "Frecuentemente": 60,
+                "Siempre": 40
+              }
+            },
+            {
+              "nombre": "positiva",
+              "filas": [
+                "El voltaje en mi sector se mantiene estable incluso cuando llueve o hace mucho viento.",
+                "Considero que la calidad de la energía que recibo es buena y no daña mis equipos."
+              ],
+              "opciones": {
+                "Nunca": 50,
+                "Rara Vez": 50
+              }
+            }
+          ]
+        },
+        "Sección 2: Interrupciones y Apagones": {
+          "tipo": "grupos_fila",
+          "grupos": [
+            {
+              "nombre": "negativa",
+              "filas": [
+                "Se va la luz en mi sector sin previo aviso o sin que haya una avería clara.",
+                "Los apagones en mi zona duran más de 4 horas seguidas.",
+                "Se producen cortes de luz breves (de pocos segundos) varias veces al día.",
+                "Los apagones ocurren siempre a la misma hora (programados).",
+                "Se va la luz cada vez que cae una llovizna o hay un poco de brisa.",
+                "Las calles de mi sector se quedan oscuras por falta de iluminación pública cuando no hay luz.",
+                "He tenido pérdidas económicas (comida dañada, trabajo perdido) por culpa de los apagones."
+              ],
+              "opciones": {
+                "Frecuentemente": 60,
+                "Siempre": 40
+              }
+            },
+            {
+              "nombre": "positiva",
+              "filas": [
+                "Recibo información clara sobre por qué se fue la luz o cuándo va a regresar.",
+                "Siento que los apagones han disminuido en comparación con el año pasado.",
+                "El servicio eléctrico se restablece rápido cuando hay una avería en el transformador."
+              ],
+              "opciones": {
+                "Nunca": 50,
+                "Rara Vez": 50
+              }
+            }
+          ]
+        },
+        "Sección 3: Infraestructura y Seguridad en el Sector": {
+          "tipo": "grupos_fila",
+          "grupos": [
+            {
+              "nombre": "negativa",
+              "filas": [
+                "Veo cables eléctricos caídos o muy bajitos en las aceras de mi comunidad.",
+                "El transformador de mi cuadra hace ruidos fuertes o suelta chispas con frecuencia.",
+                "Hay muchas conexiones ilegales (\"enredos\" de cables) en los postes de mi calle.",
+                "Las ramas de los árboles chocan con los cables de alta tensión de la zona.",
+                "Siento peligro al caminar cerca de los postes eléctricos cuando el suelo está mojado.",
+                "Hay variaciones de luz cuando un vecino enciende un equipo pesado (soldadora, motor).",
+                "Creo que la infraestructura eléctrica de mi barrio necesita una remodelación total."
+              ],
+              "opciones": {
+                "Frecuentemente": 60,
+                "Siempre": 40
+              }
+            },
+            {
+              "nombre": "positiva",
+              "filas": [
+                "He visto brigadas de la compañía eléctrica dando mantenimiento a las líneas del sector.",
+                "Considero que los postes de luz en mi calle están en buen estado y bien asegurados.",
+                "Los contadores de luz de mi cuadra están protegidos y en buen estado."
+              ],
+              "opciones": {
+                "Nunca": 50,
+                "Rara Vez": 50
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "nombre": "Perfil Positivo",
+      "descripcion": "Percibe el servicio eléctrico de forma positiva: pocas fallas, voltaje estable y buena infraestructura.",
+      "frecuencia": 35,
+      "tendencia_sugerida": "Tendencia Positiva",
+      "respuestas": {
+        "Sexo": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Masculino": 50,
+            "Femenino": 50
+          }
+        },
+        "Sección 1: Estabilidad y Calidad del Voltaje": {
+          "tipo": "grupos_fila",
+          "grupos": [
+            {
+              "nombre": "negativa",
+              "filas": [
+                "Noto que las luces de la casa parpadean o cambian de intensidad de repente.",
+                "Se me han quemado bombillos o aparatos debido a subidas de voltaje (el \"alto voltaje\").",
+                "El aire acondicionado o la nevera hacen un ruido extraño cuando arranca el motor.",
+                "Siento que la energía que llega a mi casa es inestable durante las horas de mucho calor.",
+                "Los equipos electrónicos (PC, TV) se reinician solos sin que se vaya la luz por completo.",
+                "He tenido que comprar protectores de voltaje para todos mis electrodomésticos.",
+                "Noto que los abanicos giran más lento de lo normal en ciertos momentos del día.",
+                "He reportado a la compañía eléctrica problemas con el voltaje en mi calle."
+              ],
+              "opciones": {
+                "Nunca": 50,
+                "Rara Vez": 50
+              }
+            },
+            {
+              "nombre": "positiva",
+              "filas": [
+                "El voltaje en mi sector se mantiene estable incluso cuando llueve o hace mucho viento.",
+                "Considero que la calidad de la energía que recibo es buena y no daña mis equipos."
+              ],
+              "opciones": {
+                "Frecuentemente": 60,
+                "Siempre": 40
+              }
+            }
+          ]
+        },
+        "Sección 2: Interrupciones y Apagones": {
+          "tipo": "grupos_fila",
+          "grupos": [
+            {
+              "nombre": "negativa",
+              "filas": [
+                "Se va la luz en mi sector sin previo aviso o sin que haya una avería clara.",
+                "Los apagones en mi zona duran más de 4 horas seguidas.",
+                "Se producen cortes de luz breves (de pocos segundos) varias veces al día.",
+                "Los apagones ocurren siempre a la misma hora (programados).",
+                "Se va la luz cada vez que cae una llovizna o hay un poco de brisa.",
+                "Las calles de mi sector se quedan oscuras por falta de iluminación pública cuando no hay luz.",
+                "He tenido pérdidas económicas (comida dañada, trabajo perdido) por culpa de los apagones."
+              ],
+              "opciones": {
+                "Nunca": 50,
+                "Rara Vez": 50
+              }
+            },
+            {
+              "nombre": "positiva",
+              "filas": [
+                "Recibo información clara sobre por qué se fue la luz o cuándo va a regresar.",
+                "Siento que los apagones han disminuido en comparación con el año pasado.",
+                "El servicio eléctrico se restablece rápido cuando hay una avería en el transformador."
+              ],
+              "opciones": {
+                "Frecuentemente": 60,
+                "Siempre": 40
+              }
+            }
+          ]
+        },
+        "Sección 3: Infraestructura y Seguridad en el Sector": {
+          "tipo": "grupos_fila",
+          "grupos": [
+            {
+              "nombre": "negativa",
+              "filas": [
+                "Veo cables eléctricos caídos o muy bajitos en las aceras de mi comunidad.",
+                "El transformador de mi cuadra hace ruidos fuertes o suelta chispas con frecuencia.",
+                "Hay muchas conexiones ilegales (\"enredos\" de cables) en los postes de mi calle.",
+                "Las ramas de los árboles chocan con los cables de alta tensión de la zona.",
+                "Siento peligro al caminar cerca de los postes eléctricos cuando el suelo está mojado.",
+                "Hay variaciones de luz cuando un vecino enciende un equipo pesado (soldadora, motor).",
+                "Creo que la infraestructura eléctrica de mi barrio necesita una remodelación total."
+              ],
+              "opciones": {
+                "Nunca": 50,
+                "Rara Vez": 50
+              }
+            },
+            {
+              "nombre": "positiva",
+              "filas": [
+                "He visto brigadas de la compañía eléctrica dando mantenimiento a las líneas del sector.",
+                "Considero que los postes de luz en mi calle están en buen estado y bien asegurados.",
+                "Los contadores de luz de mi cuadra están protegidos y en buen estado."
+              ],
+              "opciones": {
+                "Frecuentemente": 60,
+                "Siempre": 40
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "nombre": "Perfil Neutro",
+      "descripcion": "Percibe el servicio de forma mixta: algunos problemas pero también aspectos positivos.",
+      "frecuencia": 25,
+      "tendencia_sugerida": "Tendencia Mixta",
+      "respuestas": {
+        "Sexo": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Masculino": 50,
+            "Femenino": 50
+          }
+        },
+        "Sección 1: Estabilidad y Calidad del Voltaje": {
+          "tipo": "grupos_fila",
+          "grupos": [
+            {
+              "nombre": "negativa",
+              "filas": [
+                "Noto que las luces de la casa parpadean o cambian de intensidad de repente.",
+                "Se me han quemado bombillos o aparatos debido a subidas de voltaje (el \"alto voltaje\").",
+                "El aire acondicionado o la nevera hacen un ruido extraño cuando arranca el motor.",
+                "Siento que la energía que llega a mi casa es inestable durante las horas de mucho calor.",
+                "Los equipos electrónicos (PC, TV) se reinician solos sin que se vaya la luz por completo.",
+                "He tenido que comprar protectores de voltaje para todos mis electrodomésticos.",
+                "Noto que los abanicos giran más lento de lo normal en ciertos momentos del día.",
+                "He reportado a la compañía eléctrica problemas con el voltaje en mi calle."
+              ],
+              "opciones": {
+                "Nunca": 20,
+                "Rara Vez": 30,
+                "A veces": 30,
+                "Frecuentemente": 20
+              }
+            },
+            {
+              "nombre": "positiva",
+              "filas": [
+                "El voltaje en mi sector se mantiene estable incluso cuando llueve o hace mucho viento.",
+                "Considero que la calidad de la energía que recibo es buena y no daña mis equipos."
+              ],
+              "opciones": {
+                "A veces": 40,
+                "Frecuentemente": 40,
+                "Siempre": 20
+              }
+            }
+          ]
+        },
+        "Sección 2: Interrupciones y Apagones": {
+          "tipo": "grupos_fila",
+          "grupos": [
+            {
+              "nombre": "negativa",
+              "filas": [
+                "Se va la luz en mi sector sin previo aviso o sin que haya una avería clara.",
+                "Los apagones en mi zona duran más de 4 horas seguidas.",
+                "Se producen cortes de luz breves (de pocos segundos) varias veces al día.",
+                "Los apagones ocurren siempre a la misma hora (programados).",
+                "Se va la luz cada vez que cae una llovizna o hay un poco de brisa.",
+                "Las calles de mi sector se quedan oscuras por falta de iluminación pública cuando no hay luz.",
+                "He tenido pérdidas económicas (comida dañada, trabajo perdido) por culpa de los apagones."
+              ],
+              "opciones": {
+                "Nunca": 20,
+                "Rara Vez": 30,
+                "A veces": 30,
+                "Frecuentemente": 20
+              }
+            },
+            {
+              "nombre": "positiva",
+              "filas": [
+                "Recibo información clara sobre por qué se fue la luz o cuándo va a regresar.",
+                "Siento que los apagones han disminuido en comparación con el año pasado.",
+                "El servicio eléctrico se restablece rápido cuando hay una avería en el transformador."
+              ],
+              "opciones": {
+                "A veces": 40,
+                "Frecuentemente": 40,
+                "Siempre": 20
+              }
+            }
+          ]
+        },
+        "Sección 3: Infraestructura y Seguridad en el Sector": {
+          "tipo": "grupos_fila",
+          "grupos": [
+            {
+              "nombre": "negativa",
+              "filas": [
+                "Veo cables eléctricos caídos o muy bajitos en las aceras de mi comunidad.",
+                "El transformador de mi cuadra hace ruidos fuertes o suelta chispas con frecuencia.",
+                "Hay muchas conexiones ilegales (\"enredos\" de cables) en los postes de mi calle.",
+                "Las ramas de los árboles chocan con los cables de alta tensión de la zona.",
+                "Siento peligro al caminar cerca de los postes eléctricos cuando el suelo está mojado.",
+                "Hay variaciones de luz cuando un vecino enciende un equipo pesado (soldadora, motor).",
+                "Creo que la infraestructura eléctrica de mi barrio necesita una remodelación total."
+              ],
+              "opciones": {
+                "Nunca": 20,
+                "Rara Vez": 30,
+                "A veces": 30,
+                "Frecuentemente": 20
+              }
+            },
+            {
+              "nombre": "positiva",
+              "filas": [
+                "He visto brigadas de la compañía eléctrica dando mantenimiento a las líneas del sector.",
+                "Considero que los postes de luz en mi calle están en buen estado y bien asegurados.",
+                "Los contadores de luz de mi cuadra están protegidos y en buen estado."
+              ],
+              "opciones": {
+                "A veces": 40,
+                "Frecuentemente": 40,
+                "Siempre": 20
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "reglas_dependencia": [],
+  "tendencias_escalas": [
+    {
+      "nombre": "Tendencia Negativa",
+      "descripcion": "Los encuestados experimentan frecuentes problemas con el servicio eléctrico.",
+      "frecuencia": 40,
+      "distribuciones": {
+        "5": [20, 50, 20, 5, 5]
+      }
+    },
+    {
+      "nombre": "Tendencia Positiva",
+      "descripcion": "Los encuestados perciben mejoras y estabilidad en el servicio eléctrico.",
+      "frecuencia": 35,
+      "distribuciones": {
+        "5": [5, 20, 50, 20, 5]
+      }
+    },
+    {
+      "nombre": "Tendencia Mixta",
+      "descripcion": "Los encuestados tienen experiencias diversas, con momentos de estabilidad y problemas ocasionales.",
+      "frecuencia": 25,
+      "distribuciones": {
+        "5": [10, 30, 40, 15, 5]
+      }
+    }
+  ]
+}
