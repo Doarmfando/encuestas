@@ -84,6 +84,23 @@ class SubmitPage:
         return FakeLocator(count=0, visible=False)
 
 
+class GoogleFormResponseWithoutSubmitPage:
+    def __init__(self):
+        self.url = "https://docs.google.com/forms/d/e/test/formResponse"
+
+    def evaluate(self, script):
+        if "document.body ? document.body.innerText" in script:
+            return "Municipio de Santiago\nSexo\nMasculino\nFemenino\nSiguiente"
+        return ""
+
+    def locator(self, selector):
+        if '[role="button"]' in selector or 'button:has-text' in selector or 'input[type="submit"]' in selector:
+            return FakeLocator(count=1, visible=True)
+        if '[role="listitem"]' in selector or '[role="radio"]' in selector:
+            return FakeLocator(count=1, visible=True)
+        return FakeLocator(count=0, visible=False)
+
+
 class MicrosoftSubmitPage:
     def __init__(self):
         self.url = "https://forms.office.com/Pages/ResponsePage.aspx?id=test"
@@ -152,6 +169,10 @@ class NavigationWaitsTest(unittest.TestCase):
                 submit_clicked=True,
             )
         )
+
+    def test_google_formresponse_url_does_not_count_as_success_before_submit(self):
+        page = GoogleFormResponseWithoutSubmitPage()
+        self.assertFalse(has_success_signal(page, page.url, submit_clicked=False))
 
     def test_submission_signal_detects_microsoft_forms_spanish_confirmation_text(self):
         page = MicrosoftSubmitPage()

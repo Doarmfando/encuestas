@@ -68,9 +68,7 @@ class ExportService:
 
             for preg in preguntas_headers:
                 valor = valores.get(preg, "")
-                if isinstance(valor, list):
-                    valor = ", ".join(str(v) for v in valor)
-                datos.append(valor)
+                datos.append(self._excel_value(valor))
 
             self._escribir_fila(ws, fila, datos, col_estado=2)
 
@@ -129,3 +127,12 @@ class ExportService:
                     if "xitos" in str(valor).lower() or "exitosa" in str(valor).lower()
                     else FALLO_FILL
                 )
+
+    @staticmethod
+    def _excel_value(valor):
+        if isinstance(valor, dict):
+            partes = [f"{str(k).strip()}: {str(v).strip()}" for k, v in valor.items()]
+            return " | ".join(partes)
+        if isinstance(valor, list):
+            return ", ".join(str(v) for v in valor)
+        return valor

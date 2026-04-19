@@ -92,6 +92,28 @@ def infer_short_answer_type(question_text: str = "", field_hints: str = "") -> s
     return "numero" if looks_numeric_question(question_text, field_hints) else "texto"
 
 
+def collect_input_hints(scope, selectors: list[str] | None = None, max_inputs: int = 3) -> str:
+    """Extrae atributos de inputs para inferir si una pregunta es numérica."""
+    if selectors is None:
+        selectors = SHORT_ANSWER_INPUT_SELECTORS
+    hints = []
+    try:
+        inputs = scope.locator(", ".join(selectors))
+        for idx in range(min(inputs.count(), max_inputs)):
+            el = inputs.nth(idx)
+            attrs = [
+                f"{a}={el.get_attribute(a)}"
+                for a in ("type", "inputmode", "pattern", "aria-label", "placeholder",
+                          "min", "max", "step", "role")
+                if el.get_attribute(a)
+            ]
+            if attrs:
+                hints.append(" ".join(attrs))
+    except Exception:
+        pass
+    return " | ".join(hints)
+
+
 def dummy_value_for_question(question_text: str = "", field_hints: str = "") -> str:
     """Devuelve un valor dummy coherente para destrabar preguntas obligatorias."""
     combined = normalize_text(f"{question_text} {field_hints}")

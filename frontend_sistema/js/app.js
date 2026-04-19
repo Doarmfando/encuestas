@@ -287,16 +287,32 @@ function mostrarEstructura(data) {
         </div>`;
         (pag.preguntas || []).forEach((p, qIdx) => {
             nGlobal += 1;
+            const isMatrix = p.tipo === "matriz" || p.tipo === "matriz_checkbox";
             const tipoClass = p.tipo.includes("escala") ? "likert" :
                               p.tipo.includes("opcion") ? "radio" :
                               p.tipo.includes("seleccion") ? "check" :
                               (p.tipo.includes("texto") || p.tipo === "numero" || p.tipo === "parrafo") ? "text" :
                               p.tipo === "desplegable" ? "drop" : "";
+            const opcionesPreview = p.opciones?.length
+                ? '<div class="opciones-preview">' +
+                    (isMatrix ? 'Columnas: ' : '') +
+                    p.opciones.slice(0, 6).join(" | ") +
+                    (p.opciones.length > 6 ? ` (+${p.opciones.length - 6})` : '') +
+                  '</div>'
+                : '';
+            const filasPreview = p.filas?.length
+                ? '<div class="opciones-preview">' +
+                    'Filas: ' +
+                    p.filas.slice(0, 4).join(" | ") +
+                    (p.filas.length > 4 ? ` (+${p.filas.length - 4})` : '') +
+                  '</div>'
+                : '';
             html += `<div class="pregunta-item">
                 <div class="pregunta-text">
                     <span class="pregunta-num">${nGlobal}.</span>
                     ${p.texto}${p.obligatoria ? '<span class="obligatoria">*</span>' : ''}
-                    ${p.opciones?.length ? '<div class="opciones-preview">' + p.opciones.slice(0, 6).join(" | ") + (p.opciones.length > 6 ? ` (+${p.opciones.length - 6})` : '') + '</div>' : ''}
+                    ${filasPreview}
+                    ${opcionesPreview}
                 </div>
                 <span class="tipo ${tipoClass}">${p.tipo}</span>
                 <div class="pregunta-actions flex-gap">

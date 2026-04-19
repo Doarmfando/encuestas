@@ -2,10 +2,9 @@
 Llenador específico para Microsoft Forms.
 Usa FillingStrategies compartidas + selectores específicos de MS Forms.
 """
-from difflib import SequenceMatcher
-
 from app.automation.filling_strategies import FillingStrategies
 from app.utils.text_normalizer import normalize_for_key as _normalize_text
+from app.utils.fuzzy_matcher import similarity as _similarity
 from app.automation.navigation.waits import capture_page_state, wait_for_form_ready, wait_for_post_action, wait_for_submission_signal
 from app.automation.timing import pause_action
 from app.constants.question_types import TIPOS_NO_LLENABLES
@@ -183,8 +182,7 @@ class MSFormsFiller:
         score = 0
         if target in candidate:
             score += 1200 + min(len(target), 200)
-        ratio = SequenceMatcher(None, target, candidate[: max(len(target) * 2, 120)]).ratio()
-        score += int(ratio * 600)
+        score += int(_similarity(target, candidate[: max(len(target) * 2, 120)]) * 600)
         target_tokens = [tok for tok in target.split() if len(tok) >= 4]
         if target_tokens:
             overlap = sum(1 for tok in target_tokens if tok in candidate)

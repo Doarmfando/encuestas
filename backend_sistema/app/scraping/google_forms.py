@@ -2,9 +2,15 @@
 Scraper especializado para Google Forms.
 Combina múltiples estrategias: FB_DATA, Playwright y HTML fallback.
 """
+from copy import deepcopy
+import re
 import time
 from playwright.sync_api import sync_playwright
 
+_NUMBERING_RE = re.compile(r'^\d+[\.\)\-]+\s*')
+_WHITESPACE_RE = re.compile(r'\s+')
+
+from app.constants.question_types import TIPO_INFORMATIVO, TIPO_MATRIZ, TIPO_MATRIZ_CHECKBOX
 from app.scraping.base_scraper import BaseScraper
 from app.utils.browser_config import get_browser_context_options_from_flask
 from app.scraping.strategies.fb_data import FBDataStrategy
@@ -68,21 +74,32 @@ class GoogleFormsScraper(BaseScraper):
             pw_paginas = len(resultado_pw["paginas"])
             fb_preguntas = resultado_fb["total_preguntas"]
             pw_preguntas = resultado_pw["total_preguntas"]
+            fb_score = self._score_resultado(resultado_fb)
+            pw_score = self._score_resultado(resultado_pw)
+            fb_ok = self._is_structurally_complete(resultado_fb)
+            pw_ok = self._is_structurally_complete(resultado_pw)
 
-            print(f"\n  Comparando: FB_DATA={fb_preguntas}preg/{fb_paginas}pág vs Playwright={pw_preguntas}preg/{pw_paginas}pág")
+            print(
+                "\n  Comparando: "
+                f"FB_DATA={fb_preguntas}preg/{fb_paginas}pág/score={fb_score} "
+                f"vs Playwright={pw_preguntas}preg/{pw_paginas}pág/score={pw_score}"
+            )
 
-            if pw_paginas > 1 and pw_paginas > fb_paginas:
-                resultado = self._redistribuir_en_paginas(resultado_fb, resultado_pw)
-                print(f"  -> Preguntas de FB_DATA en estructura de {pw_paginas} páginas de Playwright")
-            elif fb_paginas > 1 and fb_paginas >= pw_paginas:
-                resultado = self._combinar_resultados(resultado_fb, resultado_pw)
-                print(f"  -> FB_DATA como base ({fb_paginas} páginas)")
-            elif fb_preguntas > pw_preguntas:
-                resultado = self._combinar_resultados(resultado_fb, resultado_pw)
-                print(f"  -> FB_DATA como base (más preguntas)")
+            if fb_ok and not pw_ok:
+                resultado = self._merge_metadata(deepcopy(resultado_fb), resultado_pw)
+                print("  -> FB_DATA como base estructuralmente completa; Playwright queda de apoyo")
+            elif pw_ok and not fb_ok:
+                resultado = self._merge_metadata(deepcopy(resultado_pw), resultado_fb)
+                print("  -> Playwright como base estructuralmente completa; FB_DATA incompleto")
             else:
-                resultado = self._combinar_resultados(resultado_pw, resultado_fb)
-                print(f"  -> Playwright como base")
+                principal, secundario, principal_nombre = (
+                    (resultado_fb, resultado_pw, "FB_DATA")
+                    if fb_score >= pw_score
+                    else (resultado_pw, resultado_fb, "Playwright")
+                )
+                resultado = self._combinar_resultados(deepcopy(principal), secundario)
+                resultado = self._merge_metadata(resultado, secundario)
+                print(f"  -> {principal_nombre} como base por score estructural")
         elif resultado_fb:
             resultado = resultado_fb
             print(f"\n  Usando solo FB_DATA")
@@ -98,17 +115,86 @@ class GoogleFormsScraper(BaseScraper):
         resultado["plataforma"] = "google_forms"
         return resultado
 
+    def _is_structurally_complete(self, resultado: dict | None) -> bool:
+        """Valida si la estructura es suficientemente buena para priorizarla."""
+        if not resultado or resultado.get("total_preguntas", 0) <= 0:
+            return False
+
+        for pregunta in self._iter_preguntas(resultado):
+            tipo = pregunta.get("tipo", "")
+            if tipo == TIPO_INFORMATIVO:
+                continue
+            if not str(pregunta.get("texto", "")).strip():
+                return False
+            if tipo in (TIPO_MATRIZ, TIPO_MATRIZ_CHECKBOX):
+                if not pregunta.get("opciones") or not pregunta.get("filas"):
+                    return False
+        return True
+
+    def _score_resultado(self, resultado: dict | None) -> int:
+        """Puntúa resultados dando prioridad a preguntas completas y matrices válidas."""
+        if not resultado:
+            return -10000
+
+        total = resultado.get("total_preguntas", 0) or 0
+        paginas = len(resultado.get("paginas", []) or [])
+        if total <= 0:
+            return -1000
+
+        vacias = 0
+        matrices_sin_opciones = 0
+        matrices_sin_filas = 0
+
+        for pregunta in self._iter_preguntas(resultado):
+            tipo = pregunta.get("tipo", "")
+            if tipo == TIPO_INFORMATIVO:
+                continue
+            if not str(pregunta.get("texto", "")).strip():
+                vacias += 1
+            if tipo in (TIPO_MATRIZ, TIPO_MATRIZ_CHECKBOX):
+                if not pregunta.get("opciones"):
+                    matrices_sin_opciones += 1
+                if not pregunta.get("filas"):
+                    matrices_sin_filas += 1
+
+        score = total * 100 + paginas * 15
+        score -= vacias * 350
+        score -= matrices_sin_opciones * 250
+        score -= matrices_sin_filas * 180
+        if vacias == 0:
+            score += 80
+        if matrices_sin_opciones == 0 and matrices_sin_filas == 0:
+            score += 40
+        return score
+
+    @staticmethod
+    def _iter_preguntas(resultado: dict):
+        for pagina in resultado.get("paginas", []) or []:
+            for pregunta in pagina.get("preguntas", []) or []:
+                yield pregunta
+
+    @staticmethod
+    def _merge_metadata(principal: dict, secundario: dict | None) -> dict:
+        """Completa metadatos sin alterar la estructura elegida."""
+        if not secundario:
+            return principal
+        if not principal.get("titulo") and secundario.get("titulo"):
+            principal["titulo"] = secundario["titulo"]
+        if not principal.get("descripcion") and secundario.get("descripcion"):
+            principal["descripcion"] = secundario["descripcion"]
+        if principal.get("paginas"):
+            last_buttons = principal["paginas"][-1].get("botones") or []
+            if "Enviar" not in last_buttons:
+                principal["paginas"][-1]["botones"] = list(dict.fromkeys(last_buttons + ["Enviar"]))
+            principal["total_preguntas"] = sum(len(p.get("preguntas", [])) for p in principal["paginas"])
+        return principal
+
     @staticmethod
     def _normalize_key(texto: str) -> str:
         """Normaliza texto de pregunta para comparación. Usa la primera línea limpia."""
-        import re
-        # Solo tomar la primera línea (antes de \n) para evitar que descripciones largas no matcheen
         first_line = texto.split("\n")[0].strip().lower().rstrip("*").strip()
-        # Quitar numeración al inicio (ej: "1.", "1)", "1.-")
-        first_line = re.sub(r'^\d+[\.\)\-]+\s*', '', first_line)
-        # Quitar espacios múltiples
-        first_line = re.sub(r'\s+', ' ', first_line).strip()
-        return first_line[:60]
+        first_line = _NUMBERING_RE.sub("", first_line)
+        return _WHITESPACE_RE.sub(" ", first_line).strip()[:60]
 
     def _match_fb_to_pw(self, fb_key: str, pw_keys: set) -> str | None:
         """Busca si una pregunta de FB_DATA coincide con alguna de Playwright."""
@@ -217,6 +303,9 @@ class GoogleFormsScraper(BaseScraper):
 
     def _combinar_resultados(self, principal, secundario):
         """Combina dos resultados, principal como base."""
+        if not secundario:
+            return self._merge_metadata(principal, None)
+
         textos_principal = set()
         for pag in principal["paginas"]:
             for preg in pag["preguntas"]:
@@ -226,7 +315,7 @@ class GoogleFormsScraper(BaseScraper):
         for pag in secundario["paginas"]:
             for preg in pag["preguntas"]:
                 key = self._normalize_key(preg["texto"])
-                if not self._match_fb_to_pw(key, textos_principal):
+                if key and not self._match_fb_to_pw(key, textos_principal):
                     preguntas_extra.append(preg)
 
         if preguntas_extra:

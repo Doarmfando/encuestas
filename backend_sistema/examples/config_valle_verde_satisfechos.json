@@ -1,0 +1,212 @@
+{
+  "nombre": "Valle Verde 1 - Satisfechos",
+  "perfiles": [
+    {
+      "nombre": "Satisfecho normal",
+      "descripcion": "Percibe algunas fallas ocasionales, pero en general considera que el servicio es aceptable y funcional.",
+      "frecuencia": 40,
+      "tendencia_sugerida": "Satisfecho normal",
+      "respuestas": {
+        "Sexo": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Masculino": 50,
+            "Femenino": 50
+          }
+        },
+        "Sección 1: Estabilidad y Calidad del Voltaje": {
+          "tipo": "fijo",
+          "valor": {
+            "Noto que las luces de la casa parpadean o cambian de intensidad de repente.": "A veces",
+            "Se me han quemado bombillos o aparatos debido a subidas de voltaje (el \"alto voltaje\").": "Rara Vez",
+            "El aire acondicionado o la nevera hacen un ruido extraño cuando arranca el motor.": "A veces",
+            "Siento que la energía que llega a mi casa es inestable durante las horas de mucho calor.": "A veces",
+            "Los equipos electrónicos (PC, TV) se reinician solos sin que se vaya la luz por completo.": "Rara Vez",
+            "He tenido que comprar protectores de voltaje para todos mis electrodomésticos.": "A veces",
+            "Noto que los abanicos giran más lento de lo normal en ciertos momentos del día.": "A veces",
+            "El voltaje en mi sector se mantiene estable incluso cuando llueve o hace mucho viento.": "Frecuentemente",
+            "He reportado a la compañía eléctrica problemas con el voltaje en mi calle.": "Rara Vez",
+            "Considero que la calidad de la energía que recibo es buena y no daña mis equipos.": "Frecuentemente"
+          }
+        },
+        "Sección 2: Interrupciones y Apagones": {
+          "tipo": "fijo",
+          "valor": {
+            "Se va la luz en mi sector sin previo aviso o sin que haya una avería clara.": "Rara Vez",
+            "Los apagones en mi zona duran más de 4 horas seguidas.": "Nunca",
+            "Se producen cortes de luz breves (de pocos segundos) varias veces al día.": "Rara Vez",
+            "Recibo información clara sobre por qué se fue la luz o cuándo va a regresar.": "A veces",
+            "Los apagones ocurren siempre a la misma hora (programados).": "Nunca",
+            "Se va la luz cada vez que cae una llovizna o hay un poco de brisa.": "Rara Vez",
+            "Las calles de mi sector se quedan oscuras por falta de iluminación pública cuando no hay luz.": "Rara Vez",
+            "He tenido pérdidas económicas (comida dañada, trabajo perdido) por culpa de los apagones.": "Nunca",
+            "Siento que los apagones han disminuido en comparación con el año pasado.": "Frecuentemente",
+            "El servicio eléctrico se restablece rápido cuando hay una avería en el transformador.": "A veces"
+          }
+        },
+        "Sección 3: Infraestructura y Seguridad en el Sector": {
+          "tipo": "fijo",
+          "valor": {
+            "Veo cables eléctricos caídos o muy bajitos en las aceras de mi comunidad.": "Rara vez",
+            "El transformador de mi cuadra hace ruidos fuertes o suelta chispas con frecuencia.": "Rara vez",
+            "Hay muchas conexiones ilegales (\"enredos\" de cables) en los postes de mi calle.": "A veces",
+            "Las ramas de los árboles chocan con los cables de alta tensión de la zona.": "Rara vez",
+            "He visto brigadas de la compañía eléctrica dando mantenimiento a las líneas del sector.": "A veces",
+            "Considero que los postes de luz en mi calle están en buen estado y bien asegurados.": "Frecuentemente",
+            "Siento peligro al caminar cerca de los postes eléctricos cuando el suelo está mojado.": "Rara vez",
+            "Hay variaciones de luz cuando un vecino enciende un equipo pesado (soldadora, motor).": "A veces",
+            "Los contadores de luz de mi cuadra están protegidos y en buen estado.": "Frecuentemente",
+            "Creo que la infraestructura eléctrica de mi barrio necesita una remodelación total.": "Rara vez"
+          }
+        }
+      }
+    },
+    {
+      "nombre": "Bastante satisfecho",
+      "descripcion": "Evalúa el servicio de manera favorable y reporta pocas incidencias importantes en voltaje, apagones e infraestructura.",
+      "frecuencia": 35,
+      "tendencia_sugerida": "Bastante satisfecho",
+      "respuestas": {
+        "Sexo": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Masculino": 50,
+            "Femenino": 50
+          }
+        },
+        "Sección 1: Estabilidad y Calidad del Voltaje": {
+          "tipo": "fijo",
+          "valor": {
+            "Noto que las luces de la casa parpadean o cambian de intensidad de repente.": "Rara Vez",
+            "Se me han quemado bombillos o aparatos debido a subidas de voltaje (el \"alto voltaje\").": "Nunca",
+            "El aire acondicionado o la nevera hacen un ruido extraño cuando arranca el motor.": "Rara Vez",
+            "Siento que la energía que llega a mi casa es inestable durante las horas de mucho calor.": "Rara Vez",
+            "Los equipos electrónicos (PC, TV) se reinician solos sin que se vaya la luz por completo.": "Nunca",
+            "He tenido que comprar protectores de voltaje para todos mis electrodomésticos.": "Rara Vez",
+            "Noto que los abanicos giran más lento de lo normal en ciertos momentos del día.": "Rara Vez",
+            "El voltaje en mi sector se mantiene estable incluso cuando llueve o hace mucho viento.": "Frecuentemente",
+            "He reportado a la compañía eléctrica problemas con el voltaje en mi calle.": "Nunca",
+            "Considero que la calidad de la energía que recibo es buena y no daña mis equipos.": "Frecuentemente"
+          }
+        },
+        "Sección 2: Interrupciones y Apagones": {
+          "tipo": "fijo",
+          "valor": {
+            "Se va la luz en mi sector sin previo aviso o sin que haya una avería clara.": "Rara Vez",
+            "Los apagones en mi zona duran más de 4 horas seguidas.": "Nunca",
+            "Se producen cortes de luz breves (de pocos segundos) varias veces al día.": "Rara Vez",
+            "Recibo información clara sobre por qué se fue la luz o cuándo va a regresar.": "Frecuentemente",
+            "Los apagones ocurren siempre a la misma hora (programados).": "Nunca",
+            "Se va la luz cada vez que cae una llovizna o hay un poco de brisa.": "Nunca",
+            "Las calles de mi sector se quedan oscuras por falta de iluminación pública cuando no hay luz.": "Nunca",
+            "He tenido pérdidas económicas (comida dañada, trabajo perdido) por culpa de los apagones.": "Nunca",
+            "Siento que los apagones han disminuido en comparación con el año pasado.": "Frecuentemente",
+            "El servicio eléctrico se restablece rápido cuando hay una avería en el transformador.": "Frecuentemente"
+          }
+        },
+        "Sección 3: Infraestructura y Seguridad en el Sector": {
+          "tipo": "fijo",
+          "valor": {
+            "Veo cables eléctricos caídos o muy bajitos en las aceras de mi comunidad.": "Rara vez",
+            "El transformador de mi cuadra hace ruidos fuertes o suelta chispas con frecuencia.": "Nunca",
+            "Hay muchas conexiones ilegales (\"enredos\" de cables) en los postes de mi calle.": "Rara vez",
+            "Las ramas de los árboles chocan con los cables de alta tensión de la zona.": "Rara vez",
+            "He visto brigadas de la compañía eléctrica dando mantenimiento a las líneas del sector.": "Frecuentemente",
+            "Considero que los postes de luz en mi calle están en buen estado y bien asegurados.": "Frecuentemente",
+            "Siento peligro al caminar cerca de los postes eléctricos cuando el suelo está mojado.": "Nunca",
+            "Hay variaciones de luz cuando un vecino enciende un equipo pesado (soldadora, motor).": "Rara vez",
+            "Los contadores de luz de mi cuadra están protegidos y en buen estado.": "Frecuentemente",
+            "Creo que la infraestructura eléctrica de mi barrio necesita una remodelación total.": "Nunca"
+          }
+        }
+      }
+    },
+    {
+      "nombre": "Muy satisfecho",
+      "descripcion": "Percibe muy buena calidad del servicio, muy poca ocurrencia de fallas y condiciones de infraestructura generalmente seguras.",
+      "frecuencia": 25,
+      "tendencia_sugerida": "Muy satisfecho",
+      "respuestas": {
+        "Sexo": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Masculino": 50,
+            "Femenino": 50
+          }
+        },
+        "Sección 1: Estabilidad y Calidad del Voltaje": {
+          "tipo": "fijo",
+          "valor": {
+            "Noto que las luces de la casa parpadean o cambian de intensidad de repente.": "Nunca",
+            "Se me han quemado bombillos o aparatos debido a subidas de voltaje (el \"alto voltaje\").": "Nunca",
+            "El aire acondicionado o la nevera hacen un ruido extraño cuando arranca el motor.": "Nunca",
+            "Siento que la energía que llega a mi casa es inestable durante las horas de mucho calor.": "Rara Vez",
+            "Los equipos electrónicos (PC, TV) se reinician solos sin que se vaya la luz por completo.": "Nunca",
+            "He tenido que comprar protectores de voltaje para todos mis electrodomésticos.": "Nunca",
+            "Noto que los abanicos giran más lento de lo normal en ciertos momentos del día.": "Nunca",
+            "El voltaje en mi sector se mantiene estable incluso cuando llueve o hace mucho viento.": "Siempre",
+            "He reportado a la compañía eléctrica problemas con el voltaje en mi calle.": "Nunca",
+            "Considero que la calidad de la energía que recibo es buena y no daña mis equipos.": "Siempre"
+          }
+        },
+        "Sección 2: Interrupciones y Apagones": {
+          "tipo": "fijo",
+          "valor": {
+            "Se va la luz en mi sector sin previo aviso o sin que haya una avería clara.": "Nunca",
+            "Los apagones en mi zona duran más de 4 horas seguidas.": "Nunca",
+            "Se producen cortes de luz breves (de pocos segundos) varias veces al día.": "Nunca",
+            "Recibo información clara sobre por qué se fue la luz o cuándo va a regresar.": "Frecuentemente",
+            "Los apagones ocurren siempre a la misma hora (programados).": "Nunca",
+            "Se va la luz cada vez que cae una llovizna o hay un poco de brisa.": "Nunca",
+            "Las calles de mi sector se quedan oscuras por falta de iluminación pública cuando no hay luz.": "Nunca",
+            "He tenido pérdidas económicas (comida dañada, trabajo perdido) por culpa de los apagones.": "Nunca",
+            "Siento que los apagones han disminuido en comparación con el año pasado.": "Siempre",
+            "El servicio eléctrico se restablece rápido cuando hay una avería en el transformador.": "Frecuentemente"
+          }
+        },
+        "Sección 3: Infraestructura y Seguridad en el Sector": {
+          "tipo": "fijo",
+          "valor": {
+            "Veo cables eléctricos caídos o muy bajitos en las aceras de mi comunidad.": "Nunca",
+            "El transformador de mi cuadra hace ruidos fuertes o suelta chispas con frecuencia.": "Nunca",
+            "Hay muchas conexiones ilegales (\"enredos\" de cables) en los postes de mi calle.": "Rara vez",
+            "Las ramas de los árboles chocan con los cables de alta tensión de la zona.": "Nunca",
+            "He visto brigadas de la compañía eléctrica dando mantenimiento a las líneas del sector.": "Frecuentemente",
+            "Considero que los postes de luz en mi calle están en buen estado y bien asegurados.": "Siempre",
+            "Siento peligro al caminar cerca de los postes eléctricos cuando el suelo está mojado.": "Nunca",
+            "Hay variaciones de luz cuando un vecino enciende un equipo pesado (soldadora, motor).": "Rara vez",
+            "Los contadores de luz de mi cuadra están protegidos y en buen estado.": "Siempre",
+            "Creo que la infraestructura eléctrica de mi barrio necesita una remodelación total.": "Nunca"
+          }
+        }
+      }
+    }
+  ],
+  "reglas_dependencia": [],
+  "tendencias_escalas": [
+    {
+      "nombre": "Satisfecho normal",
+      "descripcion": "Sesgo moderado hacia respuestas medio-altas.",
+      "frecuencia": 40,
+      "distribuciones": {
+        "5": [5, 15, 40, 30, 10]
+      }
+    },
+    {
+      "nombre": "Bastante satisfecho",
+      "descripcion": "Sesgo alto hacia respuestas positivas.",
+      "frecuencia": 35,
+      "distribuciones": {
+        "5": [2, 8, 20, 45, 25]
+      }
+    },
+    {
+      "nombre": "Muy satisfecho",
+      "descripcion": "Sesgo muy alto hacia respuestas positivas.",
+      "frecuencia": 25,
+      "distribuciones": {
+        "5": [1, 4, 10, 35, 50]
+      }
+    }
+  ]
+}

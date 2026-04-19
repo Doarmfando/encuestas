@@ -19,6 +19,7 @@ INTERACTIVE_SELECTOR = (
     '[role="listbox"], [role="button"], button'
 )
 QUESTION_SELECTOR = '[role="listitem"]'
+HEADING_SELECTOR = '[role="heading"], h1, h2, h3'
 VALIDATION_TEXTS = (
     "esta pregunta es obligatoria",
     "this is a required question",
@@ -64,17 +65,17 @@ def capture_page_state(page, url: str = "") -> dict:
     platform = detectar_plataforma(url) if url else GENERIC
     content = _safe_page_content(page).lower()
     question_titles = _extract_question_titles(page)
+    heading_titles = _extract_heading_titles(page)
 
     return {
         "url": _safe_attr(lambda: page.url, ""),
         "interactive_count": _safe_count(page, INTERACTIVE_SELECTOR),
         "next_visible": _has_visible_button(page, platform.get("next_texts", [])),
         "submit_visible": _has_visible_button(page, platform.get("submit_texts", [])),
-        "question_signature": (
-            hashlib.md5("|".join(question_titles).encode("utf-8", errors="ignore")).hexdigest()
-            if question_titles else ""
-        ),
+        "question_signature": _signature(question_titles),
         "question_count": len(question_titles),
+        "heading_signature": _signature(heading_titles),
+        "heading_count": len(heading_titles),
         "validation_visible": any(text in content for text in VALIDATION_TEXTS),
         "content_hash": hashlib.md5(content[:4000].encode("utf-8", errors="ignore")).hexdigest() if content else "",
     }
@@ -100,40 +101,10 @@ def wait_for_post_action(
             return True
 
         current = capture_page_state(page, url)
-        if current["url"] != baseline["url"]:
-            pause_settle(runtime_config, multiplier=0.5)
-            return True
-        if (
-            current["question_signature"]
-            and baseline["question_signature"]
-            and current["question_signature"] != baseline["question_signature"]
-        ):
-            pause_settle(runtime_config, multiplier=0.5)
-            return True
-        if (
-            not current["question_signature"]
-            and not baseline["question_signature"]
-            and current["content_hash"]
-            and current["content_hash"] != baseline["content_hash"]
-        ):
-            pause_settle(runtime_config, multiplier=0.5)
-            return True
-        if (
-            current["interactive_count"] != baseline["interactive_count"]
-            and current["question_signature"] != baseline["question_signature"]
-        ):
-            pause_settle(runtime_config, multiplier=0.5)
-            return True
-        if (
-            current["next_visible"] != baseline["next_visible"]
-            and current["question_signature"] != baseline["question_signature"]
-        ):
-            pause_settle(runtime_config, multiplier=0.5)
-            return True
-        if (
-            current["submit_visible"] != baseline["submit_visible"]
-            and current["question_signature"] != baseline["question_signature"]
-        ):
+        if current["validation_visible"] and not baseline["validation_visible"]:
+            return False
+
+        if _state_indicates_navigation_change(baseline, current, after_submit=after_submit):
             pause_settle(runtime_config, multiplier=0.5)
             return True
 
@@ -171,10 +142,6 @@ def has_success_signal(page, url: str = "", submit_clicked: bool = False) -> boo
     platform = detectar_plataforma(url) if url else GENERIC
     page_url = _safe_attr(lambda: page.url, "")
 
-    for pattern in platform.get("success_url_patterns", []):
-        if pattern and pattern in page_url:
-            return True
-
     content = _safe_page_content(page).lower()
     for text in platform.get("success_texts", []):
         if text and text.lower() in content:
@@ -189,17 +156,80 @@ def has_success_signal(page, url: str = "", submit_clicked: bool = False) -> boo
             return True
         return False
 
+    submit_visible = _has_visible_button(page, platform.get("submit_texts", ["Enviar", "Submit"]))
+    next_visible = _has_visible_button(page, platform.get("next_texts", ["Siguiente", "Next"]))
+    interactivos = _count_answerable_interactives(page)
+    url_match = any(pattern and pattern in page_url for pattern in platform.get("success_url_patterns", []))
+
+    if platform.get("name") == "google_forms":
+        if "closedform" in page_url.lower() and interactivos == 0:
+            return True
+        if url_match and submit_clicked and not submit_visible and not next_visible and interactivos == 0:
+            return True
+
     if not submit_clicked:
         return False
 
-    submit_visible = _has_visible_button(page, platform.get("submit_texts", ["Enviar", "Submit"]))
-    next_visible = _has_visible_button(page, platform.get("next_texts", ["Siguiente", "Next"]))
-    interactivos = _safe_count(
-        page,
-        '[role="listitem"], input:not([type="hidden"]), textarea, [role="radio"], '
-        '[role="checkbox"], [role="listbox"]',
-    )
     return not submit_visible and not next_visible and interactivos == 0
+
+
+def _state_indicates_navigation_change(baseline: dict, current: dict, after_submit: bool = False) -> bool:
+    if current["url"] != baseline["url"]:
+        return True
+
+    if (
+        current["question_signature"]
+        and baseline["question_signature"]
+        and current["question_signature"] != baseline["question_signature"]
+    ):
+        return True
+
+    if (
+        current["heading_signature"]
+        and baseline["heading_signature"]
+        and current["heading_signature"] != baseline["heading_signature"]
+        and current["content_hash"] != baseline["content_hash"]
+    ):
+        return True
+
+    if current["question_count"] != baseline["question_count"] and not current["validation_visible"]:
+        return True
+
+    if (
+        current["interactive_count"] != baseline["interactive_count"]
+        and (
+            current["question_signature"] != baseline["question_signature"]
+            or current["heading_signature"] != baseline["heading_signature"]
+        )
+    ):
+        return True
+
+    if (
+        (current["next_visible"] != baseline["next_visible"] or current["submit_visible"] != baseline["submit_visible"])
+        and (
+            current["question_signature"] != baseline["question_signature"]
+            or current["heading_signature"] != baseline["heading_signature"]
+        )
+    ):
+        return True
+
+    if (
+        current["content_hash"]
+        and current["content_hash"] != baseline["content_hash"]
+        and not current["validation_visible"]
+    ):
+        if after_submit:
+            return True
+        if current["question_signature"] != baseline["question_signature"]:
+            return True
+        if current["heading_signature"] != baseline["heading_signature"]:
+            return True
+        if current["question_count"] != baseline["question_count"]:
+            return True
+        if current["interactive_count"] != baseline["interactive_count"]:
+            return True
+
+    return False
 
 
 def _has_visible_button(page, texts: list[str]) -> bool:
@@ -250,6 +280,12 @@ def _safe_attr(getter, default):
         return default
 
 
+def _signature(values: list[str]) -> str:
+    if not values:
+        return ""
+    return hashlib.md5("|".join(values).encode("utf-8", errors="ignore")).hexdigest()
+
+
 def _extract_question_titles(page, limit: int = 8) -> list[str]:
     titles = []
     try:
@@ -269,6 +305,35 @@ def _extract_question_titles(page, limit: int = 8) -> list[str]:
         except Exception:
             continue
     return titles
+
+
+def _extract_heading_titles(page, limit: int = 6) -> list[str]:
+    titles = []
+    try:
+        items = page.locator(HEADING_SELECTOR).all()
+    except Exception:
+        return titles
+
+    for item in items:
+        if len(titles) >= limit:
+            break
+        try:
+            if hasattr(item, "is_visible") and not item.is_visible(timeout=100):
+                continue
+            title = _extract_question_title(item.inner_text(timeout=400))
+            if title:
+                titles.append(title)
+        except Exception:
+            continue
+    return titles
+
+
+def _count_answerable_interactives(page) -> int:
+    return _safe_count(
+        page,
+        '[role="listitem"], input:not([type="hidden"]), textarea, [role="radio"], '
+        '[role="checkbox"], [role="listbox"]',
+    )
 
 
 def _extract_question_title(raw_text: str) -> str:

@@ -6,7 +6,7 @@ import time
 import re
 
 from app.automation.navigation.button_detector import detectar_botones, llenar_dummy_pagina
-from app.utils.question_inference import infer_short_answer_type, SHORT_ANSWER_INPUT_SELECTORS
+from app.utils.question_inference import infer_short_answer_type, SHORT_ANSWER_INPUT_SELECTORS, collect_input_hints
 
 
 class PlaywrightNavStrategy:
@@ -315,7 +315,7 @@ class PlaywrightNavStrategy:
                 return pregunta
 
             if item.locator(", ".join(SHORT_ANSWER_INPUT_SELECTORS)).count() > 0:
-                field_hints = self._collect_input_hints(item, SHORT_ANSWER_INPUT_SELECTORS)
+                field_hints = collect_input_hints(item, SHORT_ANSWER_INPUT_SELECTORS)
                 pregunta["tipo"] = infer_short_answer_type(pregunta["texto"], field_hints)
                 return pregunta
 
@@ -357,22 +357,3 @@ class PlaywrightNavStrategy:
         except Exception:
             return False
 
-    @staticmethod
-    def _collect_input_hints(scope, selectors: list[str], max_inputs: int = 3) -> str:
-        """Extrae attrs utiles para inferir si un input corto es numerico."""
-        hints = []
-        try:
-            inputs = scope.locator(", ".join(selectors))
-            total = min(inputs.count(), max_inputs)
-            for idx in range(total):
-                el = inputs.nth(idx)
-                attrs = []
-                for attr in ("type", "inputmode", "pattern", "aria-label", "placeholder", "min", "max", "step", "role"):
-                    value = el.get_attribute(attr) or ""
-                    if value:
-                        attrs.append(f"{attr}={value}")
-                if attrs:
-                    hints.append(" ".join(attrs))
-        except Exception:
-            pass
-        return " | ".join(hints)

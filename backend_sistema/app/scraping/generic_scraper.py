@@ -76,7 +76,7 @@ class GenericScraper(BaseScraper):
             browser.close()
 
         print(f"\n  Scraping Microsoft Forms completado:")
-        print(f"    Plataforma: {platform['name']}")
+        print(f"    Plataforma: {platform_name}")
         print(f"    Preguntas: {resultado['total_preguntas']}")
 
         return resultado
