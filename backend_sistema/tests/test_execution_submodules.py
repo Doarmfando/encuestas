@@ -82,13 +82,12 @@ class ThreadLocalStdoutTest(unittest.TestCase):
 
 class BrowserManagerTest(unittest.TestCase):
 
-    def test_get_config_returns_defaults_outside_flask(self):
-        from app.services.execution.browser_manager import BrowserManager
-        mgr = BrowserManager()
-        config = mgr.get_config()
-        self.assertEqual(config["locale"], "es-PE")
-        self.assertIn("vp_w", config)
-        self.assertIn("vp_h", config)
+    def test_create_context_options_returns_defaults_outside_flask(self):
+        from app.utils.browser_config import get_browser_context_options_from_flask
+        opts = get_browser_context_options_from_flask()
+        self.assertEqual(opts["locale"], "es-PE")
+        self.assertIn("viewport", opts)
+        self.assertIn("timezone_id", opts)
 
     def test_get_filler_raises_for_unsupported_url(self):
         from app.services.execution.browser_manager import BrowserManager

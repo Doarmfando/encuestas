@@ -3,8 +3,11 @@ Manejo de dropdowns personalizados de Google Forms (role=listbox).
 Solo responsabilidad: abrir el dropdown y seleccionar la opción correcta.
 Para agregar soporte a un nuevo tipo de dropdown (ej. combobox nativo): agregar método aquí.
 """
+import logging
 from app.automation.gforms._base import normalize_match_text, prepare_scope, score_option_candidate
 from app.automation.timing import pause_action
+
+logger = logging.getLogger(__name__)
 
 
 class DropdownHandler:
@@ -48,7 +51,7 @@ class DropdownHandler:
                 page.keyboard.press("Escape")
                 pause_action(runtime_config, multiplier=0.6)
             except Exception:
-                pass
+                logger.debug("No se pudo enviar Escape para cerrar dropdown")
         return False
 
     # ── privados ──────────────────────────────────────────────────────────────

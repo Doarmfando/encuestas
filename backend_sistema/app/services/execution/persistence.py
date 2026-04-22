@@ -2,6 +2,7 @@
 Persistencia y finalización de ejecuciones: BD, Excel y resumen de métricas.
 Para agregar un nuevo formato de exportación: inyectar otro export_service en __init__.
 """
+import logging
 import time
 from datetime import datetime, timezone
 
@@ -10,6 +11,8 @@ from flask import current_app
 from app.database.connection import db
 from app.database.models import Execution, Response
 from app.services.export_service import ExportService
+
+logger = logging.getLogger(__name__)
 
 
 class ExecutionPersistence:
@@ -31,7 +34,7 @@ class ExecutionPersistence:
             ))
             db.session.commit()
         except Exception as e:
-            print(f"  Error guardando respuesta: {e}")
+            logger.error("Error guardando respuesta %s: %s", numero, e, exc_info=True)
             db.session.rollback()
 
     def update_execution(self, execution_id: int, **kwargs):
@@ -45,7 +48,7 @@ class ExecutionPersistence:
                     execution.completed_at = datetime.now(timezone.utc)
                 db.session.commit()
         except Exception as e:
-            print(f"  Error actualizando ejecución: {e}")
+            logger.error("Error actualizando ejecución %s: %s", execution_id, e, exc_info=True)
             db.session.rollback()
 
     def save_logs(self, execution_id: int, logs: str):
@@ -54,16 +57,16 @@ class ExecutionPersistence:
             if execution:
                 execution.logs = logs
                 db.session.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("No se pudieron guardar logs para ejecución %s: %s", execution_id, e)
 
     def read_logs(self, execution_id: int) -> str:
         try:
             execution = db.session.get(Execution, execution_id)
             if execution and execution.logs:
                 return execution.logs
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("No se pudieron leer logs para ejecución %s: %s", execution_id, e)
         return ""
 
     def finalize(
@@ -101,9 +104,9 @@ class ExecutionPersistence:
         if registros:
             try:
                 excel_path = self._export.export_excel(registros, resumen, estructura, export_dir)
-                print(f"\n  Excel: {excel_path}")
+                logger.info("Excel generado: %s", excel_path)
             except Exception as e:
-                print(f"  Error generando Excel: {e}")
+                logger.error("Error generando Excel para ejecución %s: %s", execution_id, e, exc_info=True)
 
         self.update_execution(
             execution_id,
@@ -129,17 +132,16 @@ def _fmt(segundos: float) -> str:
     return f"{horas}h {minutos % 60}m {segs:.0f}s"
 
 
+_summary_logger = logging.getLogger(__name__)
+
+
 def _print_summary(exitosas: int, cantidad: int, tasa: float, tiempo_final: float, metrics: dict, n: int):
-    print(f"\n  Perfil velocidad: {metrics.get('speed_profile', '?')}")
-    print(f"  Generacion total: {_fmt(metrics['generation_time'])}")
-    print(f"  Llenado activo: {_fmt(metrics['fill_time'])}")
-    print(f"  Pausas intencionales: {_fmt(metrics['pause_time'])}")
-    print(f"  Reintentos totales: {metrics['retry_count']}")
-    print(f"  Promedio generacion: {_fmt(metrics['generation_time'] / n)}")
-    print(f"  Promedio activo: {_fmt(metrics['fill_time'] / n)}")
-    print(f"  Promedio pausa: {_fmt(metrics['pause_time'] / n)}")
-    print(f"  Promedio total: {_fmt(tiempo_final / n)}")
-    print(f"\n{'='*55}")
-    print(f"  RESUMEN: {exitosas}/{cantidad} exitosas ({tasa:.0f}%)")
-    print(f"  Tiempo: {_fmt(tiempo_final)} total")
-    print(f"{'='*55}")
+    _summary_logger.info(
+        "RESUMEN: %s/%s exitosas (%.0f%%) en %s | perfil=%s gen=%s fill=%s pausas=%s reintentos=%s",
+        exitosas, cantidad, tasa, _fmt(tiempo_final),
+        metrics.get("speed_profile", "?"),
+        _fmt(metrics["generation_time"]),
+        _fmt(metrics["fill_time"]),
+        _fmt(metrics["pause_time"]),
+        metrics["retry_count"],
+    )

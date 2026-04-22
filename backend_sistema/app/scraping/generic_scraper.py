@@ -1,8 +1,12 @@
 """
 Scraper auxiliar para Microsoft Forms con IA/HTML como fallback controlado.
 """
+import logging
 import time
+
 from playwright.sync_api import sync_playwright
+
+logger = logging.getLogger(__name__)
 
 from app.scraping.base_scraper import BaseScraper
 from app.utils.browser_config import get_browser_context_options_from_flask
@@ -33,9 +37,9 @@ class GenericScraper(BaseScraper):
         platform_name = "microsoft_forms"
         resultado = self.resultado_vacio(url, platform_name)
         if detected["name"] != "microsoft_forms":
-            print(f"  [MS Forms] URL no matchea patrón MS Forms (detectada: {detected['name']}). Forzando scrapeo.")
+            logger.info("[MS Forms] URL detectada como '%s'. Forzando scrapeo.", detected["name"])
 
-        print("  [MS Forms] Intentando API interna...")
+        logger.info("[MS Forms] Intentando API interna...")
         api_result = self.ms_strategy.extract(url=url)
         if api_result and api_result["total_preguntas"] > 0:
             return api_result
@@ -52,22 +56,22 @@ class GenericScraper(BaseScraper):
             resultado["url"] = page.url
             html = page.content()
 
-            print("  [MS Forms] Intentando con HTML renderizado...")
+            logger.info("[MS Forms] Intentando con HTML renderizado...")
             ms_result = self.ms_strategy.extract(url=url, html=html, page=page)
             if ms_result and ms_result["total_preguntas"] > 0:
                 browser.close()
                 return ms_result
 
             if self.ai_strategy:
-                print("  [MS Forms] Analizando con IA como fallback...")
+                logger.info("[MS Forms] Analizando con IA como fallback...")
                 ai_result = self.ai_strategy.extract(page=page, html=html, url=url)
                 if ai_result and ai_result["total_preguntas"] > 0:
                     browser.close()
                     ai_result["plataforma"] = platform_name
-                    print(f"  -> IA detectó {ai_result['total_preguntas']} preguntas")
+                    logger.info("IA detectó %s preguntas", ai_result["total_preguntas"])
                     return ai_result
 
-            print("  [MS Forms] Fallback final: parsing HTML...")
+            logger.info("[MS Forms] Fallback final: parsing HTML...")
             html_result = self.html_strategy.extract(html, url)
             if html_result:
                 resultado = html_result
@@ -75,8 +79,6 @@ class GenericScraper(BaseScraper):
 
             browser.close()
 
-        print(f"\n  Scraping Microsoft Forms completado:")
-        print(f"    Plataforma: {platform_name}")
-        print(f"    Preguntas: {resultado['total_preguntas']}")
+        logger.info("Scraping MS Forms completado: %s preguntas", resultado["total_preguntas"])
 
         return resultado

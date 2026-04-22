@@ -4,7 +4,11 @@ Usa un proveedor de IA para entender la estructura de cualquier formulario.
 """
 import base64
 import json
+import logging
+
 from app.ai.prompts import PROMPT_SISTEMA_SCRAPING, PROMPT_ANALIZAR_HTML
+
+logger = logging.getLogger(__name__)
 
 
 class AIAnalysisStrategy:
@@ -46,7 +50,7 @@ class AIAnalysisStrategy:
             return self._extract_from_html(html_truncated, url, provider)
 
         except Exception as e:
-            print(f"  [AI Analysis] Error: {e}")
+            logger.warning("[AI Analysis] Error: %s", e)
             return None
 
     def _extract_with_vision(self, page, html: str, url: str, provider) -> dict | None:
@@ -69,7 +73,7 @@ class AIAnalysisStrategy:
             data = json.loads(result)
             return self._normalizar_resultado(data, url)
         except Exception as e:
-            print(f"  [AI Vision] Fallback a solo HTML: {e}")
+            logger.debug("[AI Vision] Fallback a solo HTML: %s", e)
             return self._extract_from_html(html, url, provider)
 
     def _extract_from_html(self, html: str, url: str, provider) -> dict | None:
@@ -85,7 +89,7 @@ class AIAnalysisStrategy:
             data = json.loads(result)
             return self._normalizar_resultado(data, url)
         except Exception as e:
-            print(f"  [AI HTML] Error: {e}")
+            logger.warning("[AI HTML] Error: %s", e)
             return None
 
     def _normalizar_resultado(self, data: dict, url: str) -> dict | None:

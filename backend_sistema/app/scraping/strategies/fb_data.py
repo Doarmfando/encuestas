@@ -4,7 +4,10 @@ Extrae la variable JS y normaliza multiples shapes internos al contrato canonico
 """
 import html as html_lib
 import json
+import logging
 import re
+
+logger = logging.getLogger(__name__)
 
 from app.constants.question_types import (
     GOOGLE_FORMS_TYPE_MAP,
@@ -38,7 +41,7 @@ class FBDataStrategy:
         if not data:
             return None
 
-        print("  [FB_DATA] Variable encontrada, parseando...")
+        logger.info("[FB_DATA] Variable encontrada, parseando...")
         resultado = {
             "url": url,
             "titulo": "",
@@ -50,7 +53,8 @@ class FBDataStrategy:
         }
 
         resultado = self._parsear_fb_data(data, html, resultado)
-        print(f"    -> {resultado['total_preguntas']} preguntas en {len(resultado['paginas'])} pÃ¡ginas")
+        logger.info("[FB_DATA] %s preguntas en %s páginas",
+                    resultado["total_preguntas"], len(resultado["paginas"]))
         return resultado if resultado["total_preguntas"] > 0 else None
 
     def _extraer_fb_data(self, html: str):
@@ -64,7 +68,7 @@ class FBDataStrategy:
             data, _ = decoder.raw_decode(payload_raw)
             return data
         except Exception as e:
-            print(f"  Error extrayendo FB_DATA: {e}")
+            logger.debug("Error extrayendo FB_DATA: %s", e)
         return None
 
     def _parsear_fb_data(self, data, html: str, resultado):
@@ -83,7 +87,7 @@ class FBDataStrategy:
                 resultado = self._intentar_parseo_alternativo(data, resultado)
 
         except Exception as e:
-            print(f"  Error parseando FB_DATA: {e}")
+            logger.debug("Error parseando FB_DATA: %s", e)
 
         return resultado
 
@@ -280,7 +284,7 @@ class FBDataStrategy:
             return pregunta if pregunta["texto"] else None
 
         except Exception as e:
-            print(f"    Error parseando item: {e}")
+            logger.debug("Error parseando item: %s", e)
             return None
 
     def _append_options_from_dato(self, pregunta: dict, dato: list):

@@ -2,6 +2,9 @@ import unittest
 from unittest.mock import Mock, patch
 
 from app.automation.google_forms_filler import GoogleFormsFiller
+from app.automation.gforms.dropdown_handler import DropdownHandler
+from app.automation.gforms.special_inputs import SpecialInputHandler
+from app.automation.gforms._base import normalize_match_text
 
 
 ZERO_RUNTIME = {"timing": {"action_pause_min": 0, "action_pause_max": 0}}
@@ -140,21 +143,23 @@ class GoogleFormsFillerTest(unittest.TestCase):
         self.assertFalse(exito)
         click_boton_mock.assert_not_called()
 
-    def test_dropdown_falls_back_to_enter_when_click_does_not_confirm(self):
-        filler = GoogleFormsFiller()
+    @patch("app.automation.gforms.dropdown_handler.pause_action", return_value=0)
+    def test_dropdown_falls_back_to_enter_when_click_does_not_confirm(self, _pause):
+        handler = DropdownHandler()
         page = FakePage()
         listbox = FakeListbox()
         page.listbox = listbox
         page.option_items = [FakeOption(page, "32 - 38")]
 
-        selected = filler._click_dropdown_option(page, listbox, filler._normalize_match_text("32 - 38"), ZERO_RUNTIME)
+        selected = handler._click_option(page, listbox, normalize_match_text("32 - 38"), ZERO_RUNTIME)
 
         self.assertTrue(selected)
         self.assertIn("Enter", page.keyboard.presses)
         self.assertEqual(listbox.selected_value, "32 - 38")
 
-    def test_scale_response_does_not_select_random_option_when_target_missing(self):
-        filler = GoogleFormsFiller()
+    @patch("app.automation.gforms.special_inputs.pause_action", return_value=0)
+    def test_scale_response_does_not_select_random_option_when_target_missing(self, _pause):
+        handler = SpecialInputHandler()
 
         class MissingRadio:
             def __init__(self):
@@ -176,7 +181,7 @@ class GoogleFormsFillerTest(unittest.TestCase):
                 return FakeLocator([])
 
         scope = MissingScope()
-        count = filler._responder_escalas_scoped(FakePage(), [("Totalmente de acuerdo", scope)], ZERO_RUNTIME)
+        count = handler.fill_scales(FakePage(), [("Totalmente de acuerdo", scope)], ZERO_RUNTIME)
 
         self.assertEqual(count, 0)
         self.assertFalse(any(r.clicked for r in scope.radios))

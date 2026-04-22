@@ -3,7 +3,9 @@ Preparación del resumen de encuesta para enviar a la IA.
 Solo responsabilidad: transformar la estructura scrapeada en un resumen compacto.
 Para agregar un nuevo campo al resumen: editar solo este archivo.
 """
-
+from app.constants.limits import MIN_PERFILES as _MIN_PERFILES, MAX_PERFILES as _MAX_PERFILES
+from app.constants.limits import MIN_TENDENCIAS as _MIN_TENDENCIAS, MAX_TENDENCIAS as _MAX_TENDENCIAS
+from app.constants.question_types import PATRONES_LIKERT
 
 DEMOGRAPHIC_QUESTION_KEYWORDS = (
     "edad", "age", "sexo", "género", "genero", "gender", "ocupación", "ocupacion",
@@ -12,11 +14,6 @@ DEMOGRAPHIC_QUESTION_KEYWORDS = (
     "educación", "educacion", "instrucción", "instruccion",
 )
 
-_MIN_PERFILES = 3
-_MAX_PERFILES = 4
-_MIN_TENDENCIAS = 3
-_MAX_TENDENCIAS = 4
-
 
 def es_escala(tipo: str, opciones: list | None = None) -> bool:
     """Determina si un tipo de pregunta es escala/Likert (incluye Likert disfrazado)."""
@@ -24,15 +21,7 @@ def es_escala(tipo: str, opciones: list | None = None) -> bool:
         return True
     if tipo == "opcion_multiple" and opciones and len(opciones) >= 3:
         opciones_lower = {o.lower().strip() for o in opciones}
-        patrones_likert = [
-            {"nunca", "casi nunca", "a veces", "muchas veces", "siempre"},
-            {"nunca", "raramente", "a veces", "frecuentemente", "siempre"},
-            {"muy en desacuerdo", "en desacuerdo", "neutral", "de acuerdo", "muy de acuerdo"},
-            {"totalmente en desacuerdo", "en desacuerdo", "ni de acuerdo ni en desacuerdo", "de acuerdo", "totalmente de acuerdo"},
-            {"nada", "poco", "algo", "bastante", "mucho"},
-            {"never", "rarely", "sometimes", "often", "always"},
-        ]
-        for patron in patrones_likert:
+        for patron in PATRONES_LIKERT:
             if len(opciones_lower & patron) >= 3:
                 return True
     return False

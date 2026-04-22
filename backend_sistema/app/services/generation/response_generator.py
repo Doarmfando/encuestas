@@ -4,26 +4,17 @@ Solo responsabilidad: traducir config del perfil + estructura del formulario →
 Para agregar soporte a un nuevo tipo de pregunta: agregar un elif en _valor_para_tipo.
 """
 import random
+from app.constants.question_types import PATRONES_LIKERT
 from app.services.analysis.survey_preparator import es_escala
 from app.services.generation.text_inferrer import infer_text_value
 from app.utils.text_normalizer import normalize_for_matching
-
-
-_PATRONES_LIKERT = [
-    {"nunca", "casi nunca", "a veces", "muchas veces", "siempre"},
-    {"nunca", "raramente", "a veces", "frecuentemente", "siempre"},
-    {"muy en desacuerdo", "en desacuerdo", "neutral", "de acuerdo", "muy de acuerdo"},
-    {"totalmente en desacuerdo", "en desacuerdo", "ni de acuerdo ni en desacuerdo", "de acuerdo", "totalmente de acuerdo"},
-    {"nada", "poco", "algo", "bastante", "mucho"},
-    {"never", "rarely", "sometimes", "often", "always"},
-]
 
 
 def _es_likert(opciones: list) -> bool:
     if len(opciones) < 3:
         return False
     lower = {o.lower().strip() for o in opciones}
-    return any(len(lower & patron) >= 3 for patron in _PATRONES_LIKERT)
+    return any(len(lower & patron) >= 3 for patron in PATRONES_LIKERT)
 
 
 class ResponseGenerator:
@@ -161,11 +152,8 @@ class ResponseGenerator:
                 for fila in filas:
                     if tipo == "aleatorio":
                         opciones_cfg = config.get("opciones", {})
-                        if opciones_cfg:
-                            items, pesos = list(opciones_cfg.keys()), list(opciones_cfg.values())
-                            val = random.choices(items, weights=pesos)[0]
-                        else:
-                            val = random.choice(opciones_disponibles) if opciones_disponibles else ""
+                        val = (self._pick_weighted(opciones_cfg) if opciones_cfg
+                               else random.choice(opciones_disponibles) if opciones_disponibles else "")
                         resultado[fila] = [val] if pregunta_tipo == "matriz_checkbox" else val
                     else:
                         resultado[fila] = valor_base
@@ -181,32 +169,25 @@ class ResponseGenerator:
         fila_a_grupo: dict = {}
         for grupo in grupos:
             for fila in grupo.get("filas", []):
-                fila_norm = normalize_for_matching(fila)
-                fila_a_grupo[fila_norm] = grupo
+                fila_a_grupo[normalize_for_matching(fila)] = grupo
 
         for fila in filas:
             fila_norm = normalize_for_matching(fila)
-            grupo = fila_a_grupo.get(fila_norm)
-
-            if grupo is None:
-                for key_norm, g in fila_a_grupo.items():
-                    if fila_norm in key_norm or key_norm in fila_norm:
-                        grupo = g
-                        break
-
-            if grupo:
-                opciones_cfg = grupo.get("opciones", {})
-                if opciones_cfg:
-                    items, pesos = list(opciones_cfg.keys()), list(opciones_cfg.values())
-                    val = random.choices(items, weights=pesos)[0]
-                else:
-                    val = ""
-            else:
-                val = ""
-
+            grupo = fila_a_grupo.get(fila_norm) or next(
+                (g for k, g in fila_a_grupo.items() if fila_norm in k or k in fila_norm),
+                None,
+            )
+            val = self._pick_weighted(grupo.get("opciones", {}) if grupo else {})
             resultado[fila] = [val] if pregunta_tipo == "matriz_checkbox" else val
 
         return resultado
+
+    @staticmethod
+    def _pick_weighted(opciones_cfg: dict) -> str:
+        if not opciones_cfg:
+            return ""
+        items, pesos = list(opciones_cfg.keys()), list(opciones_cfg.values())
+        return random.choices(items, weights=pesos)[0]
 
     def _generar_multiple(self, config: dict, opciones_disponibles: list) -> list:
         patrones = config.get("patrones", [])

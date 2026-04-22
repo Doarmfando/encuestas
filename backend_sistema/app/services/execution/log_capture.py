@@ -1,11 +1,30 @@
 """
 Infraestructura de captura de logs por hilo.
-Redirige prints al buffer del hilo activo para enviarlos al frontend.
+Redirige prints y logger al buffer del hilo activo para enviarlos al frontend.
 """
 import io
+import logging
 import threading
 
 thread_local = threading.local()
+
+
+class ThreadLocalLogHandler(logging.Handler):
+    """Logging handler que escribe al LogCapture del hilo activo.
+
+    Solo captura loggers del paquete app.* para no contaminar el buffer
+    con mensajes de werkzeug, sqlalchemy u otras librerías.
+    """
+
+    def emit(self, record):
+        if not record.name.startswith("app."):
+            return
+        capture = getattr(thread_local, "log_capture", None)
+        if capture:
+            try:
+                capture.write(self.format(record) + "\n")
+            except Exception:
+                pass
 
 
 class ThreadLocalStdout:

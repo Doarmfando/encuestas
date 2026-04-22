@@ -3,6 +3,7 @@ Orquestador de ejecución del bot.
 Delega logs, browser y persistencia a submódulos en execution/.
 Para cambiar el motor de browser o la lógica de reintento, editar solo execution/browser_manager.py.
 """
+import logging
 import sys
 import time
 import threading
@@ -17,6 +18,8 @@ from app.services.execution import (
     BrowserManager, ExecutionPersistence,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class ExecutionService:
     """Orquesta el llenado de encuestas: genera → llena → persiste."""
@@ -27,9 +30,9 @@ class ExecutionService:
 
     _stdout_installed = False
 
-    def __init__(self, ai_service=None, generator: GeneratorService = None):
+    def __init__(self, ai_service=None, generator: GeneratorService = None, browser: BrowserManager = None):
         self.generator = generator or GeneratorService()
-        self._browser = BrowserManager()
+        self._browser = browser or BrowserManager()
         self._db = ExecutionPersistence()
         self._stop_events: dict[int, threading.Event] = {}
         self._log_captures: dict[int, LogCapture] = {}
@@ -60,7 +63,7 @@ class ExecutionService:
                 self._run(execution_id, url, configuracion, estructura,
                           cantidad, headless, speed_profile, stop_event)
             except Exception as e:
-                print(f"  Error fatal en ejecución: {e}")
+                logger.error("Error fatal en ejecución %s: %s", execution_id, e, exc_info=True)
                 self._db.update_execution(execution_id, status="error", mensaje=f"Error: {str(e)[:200]}")
             finally:
                 thread_local.log_capture = None
@@ -86,7 +89,6 @@ class ExecutionService:
     def _run(self, execution_id, url, configuracion, estructura, cantidad,
              headless, speed_profile, stop_event):
         filler = self._browser.get_filler(url)
-        browser_config = self._browser.get_config()
         runtime_config = build_runtime_config(speed_profile, headless=headless)
         metrics = {"generation_time": 0.0, "fill_time": 0.0, "pause_time": 0.0,
                    "retry_count": 0, "speed_profile": runtime_config["speed_profile"]}
@@ -96,10 +98,11 @@ class ExecutionService:
             mensaje=f"Iniciando {cantidad} encuestas ({runtime_config['speed_profile']})...",
             total=cantidad,
         )
-        print(f"\n Bot - {cantidad} respuestas")
-        print(f"   URL: {url[:60]}...")
-        print(f"   Modo: {'Invisible' if headless else 'Visible'} | Perfil: {runtime_config['speed_profile']}")
-        print(f"   Inicio: {datetime.now().strftime('%H:%M:%S')}")
+        logger.info("Bot - %s respuestas | URL: %s... | Modo: %s | Perfil: %s | Inicio: %s",
+                    cantidad, url[:60],
+                    "Invisible" if headless else "Visible",
+                    runtime_config["speed_profile"],
+                    datetime.now().strftime("%H:%M:%S"))
 
         inicio = time.time()
         exitosas = fallidas = fallos_consecutivos = 0
@@ -107,34 +110,34 @@ class ExecutionService:
 
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=headless)
-            context = self._browser.create_context(browser, browser_config)
+            context = self._browser.create_context(browser)
 
             for i in range(1, cantidad + 1):
                 if stop_event.is_set():
-                    print(f"\n  Detenido por el usuario en #{i}")
+                    logger.info("Detenido por el usuario en #%s", i)
                     self._db.update_execution(execution_id, status="detenido", mensaje="Detenido por el usuario")
                     break
 
                 if fallos_consecutivos >= self.MAX_FALLOS_CONSECUTIVOS:
                     msg = f"Detenido: {self.MAX_FALLOS_CONSECUTIVOS} fallos consecutivos"
-                    print(f"\n  {msg}")
+                    logger.warning(msg)
                     self._db.update_execution(execution_id, status="error", mensaje=msg)
                     break
 
                 if (i - 1) > 0 and (i - 1) % self.RENOVAR_CONTEXTO_CADA == 0:
-                    print("  Renovando contexto de browser...")
+                    logger.info("Renovando contexto de browser...")
                     try:
                         context.close()
                     except Exception:
                         pass
-                    context = self._browser.create_context(browser, browser_config)
+                    context = self._browser.create_context(browser)
 
                 gen_inicio = time.perf_counter()
                 respuesta = self.generator.generate(configuracion, estructura)
                 metrics["generation_time"] += time.perf_counter() - gen_inicio
 
                 exito, tiempo, intentos, context = self._ejecutar_con_reintentos(
-                    filler, context, respuesta, url, i, browser, browser_config, runtime_config
+                    filler, context, respuesta, url, i, browser, runtime_config
                 )
                 metrics["fill_time"] += tiempo
                 metrics["retry_count"] += max(0, intentos - 1)
@@ -161,12 +164,13 @@ class ExecutionService:
                     tiempo_transcurrido=_fmt(transcurrido),
                     tiempo_por_encuesta=_fmt(transcurrido / i),
                 )
-                print(f"  {i}/{cantidad} | exitosas: {exitosas} fallidas: {fallidas} | {_fmt(transcurrido)}")
+                logger.info("%s/%s | exitosas: %s fallidas: %s | %s",
+                            i, cantidad, exitosas, fallidas, _fmt(transcurrido))
 
                 if i < cantidad and not stop_event.is_set():
                     pausa = pause_between_surveys(runtime_config, stop_event=stop_event)
                     metrics["pause_time"] += pausa
-                    print(f"  Pausa {pausa:.1f}s...")
+                    logger.debug("Pausa %.1fs...", pausa)
 
             try:
                 context.close()
@@ -185,7 +189,7 @@ class ExecutionService:
     # ── reintentos ─────────────────────────────────────────────────────────────
 
     def _ejecutar_con_reintentos(self, filler, context, respuesta, url, numero,
-                                  browser, browser_config, runtime_config):
+                                  browser, runtime_config):
         fill_start = time.perf_counter()
         for intento in range(1, self.MAX_REINTENTOS + 1):
             page = None
@@ -195,14 +199,14 @@ class ExecutionService:
                 return exito, time.perf_counter() - fill_start, intento, context
             except Exception as e:
                 error_msg = str(e)
-                print(f"  Error #{numero} (intento {intento}/{self.MAX_REINTENTOS}): {error_msg[:80]}")
+                logger.warning("Error #%s (intento %s/%s): %s", numero, intento, self.MAX_REINTENTOS, error_msg[:80])
                 if "closed" in error_msg.lower() or "crashed" in error_msg.lower():
-                    print("  Recreando contexto de browser...")
+                    logger.info("Recreando contexto de browser...")
                     try:
                         context.close()
                     except Exception:
                         pass
-                    context = self._browser.create_context(browser, browser_config)
+                    context = self._browser.create_context(browser)
                 if intento == self.MAX_REINTENTOS:
                     return False, time.perf_counter() - fill_start, intento, context
             finally:

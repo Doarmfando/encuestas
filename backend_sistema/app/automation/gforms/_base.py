@@ -5,9 +5,9 @@ Para agregar un nuevo método de normalización o helper: solo editar aquí.
 import re
 import time
 import unicodedata
-from difflib import SequenceMatcher
 
 from app.automation.timing import pause_action
+from app.utils.fuzzy_matcher import similarity as _similarity
 
 
 def normalize_match_text(value: str, strip_numbering: bool = False) -> str:
@@ -53,7 +53,7 @@ def score_option_candidate(values: list[str], target: str) -> int:
         if candidate == target_norm:
             best = max(best, 1200)
             continue
-        ratio = SequenceMatcher(None, target_norm, candidate).ratio()
+        ratio = _similarity(target_norm, candidate)
         if ratio >= 0.97:
             best = max(best, int(ratio * 1000))
     return best

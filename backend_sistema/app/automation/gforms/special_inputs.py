@@ -3,10 +3,26 @@ Inputs especiales de Google Forms: fechas, horas, matrices y escalas.
 Solo responsabilidad: manejar tipos de campo que no son texto ni opciones simples.
 Para agregar soporte a un nuevo tipo especial (ej. slider de rango): solo editar aquí.
 """
+import logging
+
 from app.automation.gforms._base import click_control, normalize_match_text, prepare_scope, score_option_candidate
 from app.automation.filling_strategies import FillingStrategies
 from app.automation.timing import pause_action
 from app.utils.fuzzy_matcher import similarity as _similarity
+
+logger = logging.getLogger(__name__)
+
+_IS_ANCESTOR_HIDDEN_JS = (
+    "el => { let p = el; while (p) {"
+    " if (p.getAttribute && p.getAttribute('aria-hidden') === 'true') return true;"
+    " p = p.parentElement; } return false; }"
+)
+# Same logic as a named JS function body for use inside larger evaluate() strings
+_IS_HIDDEN_JS_FN = (
+    "node => { let p = node; while (p) {"
+    " if (p.getAttribute && p.getAttribute('aria-hidden') === 'true') return true;"
+    " p = p.parentElement; } return false; }"
+)
 
 
 def _match_col_index(col_headers: list, target_norm: str) -> int:
@@ -86,7 +102,7 @@ class SpecialInputHandler:
         prepare_scope(scope)
         try:
             rows = self._find_matrix_rows(scope, page, container, valor)
-            print(f"      [matriz] {len(rows)} filas encontradas")
+            logger.debug("[matriz] %s filas encontradas", len(rows))
             if not rows:
                 return False
 
@@ -99,7 +115,7 @@ class SpecialInputHandler:
             if not col_headers and page is not None:
                 col_headers = self._find_col_headers(page)
             if col_headers:
-                print(f"      [matriz] columnas: {col_headers}")
+                logger.debug("[matriz] columnas: %s", col_headers)
 
             if isinstance(valor, dict):
                 return self._fill_matrix_dict(rows, valor, role, runtime_config, col_headers)
@@ -114,7 +130,7 @@ class SpecialInputHandler:
                 return completadas > 0
             return False
         except Exception as e:
-            print(f"      Error matriz: {e}")
+            logger.debug("Error matriz: %s", e)
             return False
 
     def _find_matrix_rows(self, scope, page, container, valor) -> list:
@@ -123,20 +139,14 @@ class SpecialInputHandler:
                 'div[class*="ssX1Bd"]:has([role="radio"]), '
                 'div[class*="ssX1Bd"]:has([role="checkbox"])')
 
-        _IS_HIDDEN_JS = (
-            "el => { let p = el; while (p) {"
-            " if (p.getAttribute && p.getAttribute('aria-hidden') === 'true') return true;"
-            " p = p.parentElement; } return false; }"
-        )
-
-        def _is_hidden(el):
-            try:
-                return bool(el.evaluate(_IS_HIDDEN_JS))
-            except Exception:
-                return False
-
         def _filter_hidden(candidates):
-            visible = [r for r in candidates if not _is_hidden(r)]
+            visible = []
+            for r in candidates:
+                try:
+                    if not r.evaluate(_IS_ANCESTOR_HIDDEN_JS):
+                        visible.append(r)
+                except Exception:
+                    visible.append(r)
             return visible or candidates
 
         # Estrategia 1: buscar en el scope dado
@@ -223,7 +233,7 @@ class SpecialInputHandler:
                 best_key = normalize_match_text(best_payload[0])
 
             if not best_payload:
-                print(f"        [matriz] fila sin match: '{row_label[:40]}'")
+                logger.debug("[matriz] fila sin match: '%s'", row_label[:40])
                 continue
 
             _, col_val = best_payload
@@ -254,15 +264,8 @@ class SpecialInputHandler:
         """Extrae los textos de columna del encabezado visible de la matriz."""
         try:
             result = scope.evaluate(
-                """el => {
-                    const isHidden = node => {
-                        let p = node;
-                        while (p) {
-                            if (p.getAttribute && p.getAttribute('aria-hidden') === 'true') return true;
-                            p = p.parentElement;
-                        }
-                        return false;
-                    };
+                f"""el => {{
+                    const isHidden = {_IS_HIDDEN_JS_FN};
                     const rows = Array.from(el.querySelectorAll('div[class*="ssX1Bd"]'));
                     const header = rows.find(r =>
                         !r.querySelector('[role="radio"],[role="checkbox"]') && !isHidden(r)
@@ -271,7 +274,7 @@ class SpecialInputHandler:
                     return Array.from(header.children)
                         .map(c => (c.innerText || '').trim())
                         .filter(t => t.length > 0);
-                }"""
+                }}"""
             )
             return result if isinstance(result, list) else []
         except Exception:
@@ -313,7 +316,7 @@ class SpecialInputHandler:
                     pause_action(runtime_config, multiplier=0.8)
             except Exception:
                 continue
-        print(f"    Respondidas {respondidas} escalas")
+        logger.debug("Respondidas %s escalas", respondidas)
         return respondidas
 
     @staticmethod

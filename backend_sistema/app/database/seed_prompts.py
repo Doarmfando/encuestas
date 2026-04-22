@@ -1,6 +1,8 @@
 """
 Seed de prompts por defecto. Se insertan en la BD al iniciar si no existen.
 """
+import logging
+
 from app.ai.prompts import (
     PROMPT_SISTEMA_ANALISIS,
     PROMPT_ANALISIS_ENCUESTA,
@@ -8,6 +10,8 @@ from app.ai.prompts import (
     PROMPT_ANALIZAR_HTML,
     PROMPT_GENERAR_PERFIL,
 )
+
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_PROMPTS = {
@@ -54,7 +58,7 @@ def seed_prompts(db):
                 is_default=True,
             )
             db.session.add(prompt)
-            print(f"  [seed] Prompt '{slug}' creado")
+            logger.info("[seed] Prompt '%s' creado", slug)
         elif existing.is_default:
             existing.nombre = data["nombre"]
             existing.descripcion = data["descripcion"]

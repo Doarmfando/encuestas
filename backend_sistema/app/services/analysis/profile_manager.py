@@ -4,12 +4,9 @@ Solo responsabilidad: garantizar que los perfiles existan, tengan el formato cor
 y no contengan supuestos demográficos inventados. Para cambiar la cantidad de perfiles
 o sus nombres por defecto: solo editar este archivo.
 """
+from app.constants.limits import MIN_PERFILES, MAX_PERFILES
 from app.services.analysis.survey_preparator import es_escala, DEMOGRAPHIC_QUESTION_KEYWORDS
 from app.services.analysis.response_normalizer import ResponseNormalizer
-
-
-MIN_PERFILES = 3
-MAX_PERFILES = 4
 
 SAFE_PROFILE_NAMES = [
     "Perfil conductual A",

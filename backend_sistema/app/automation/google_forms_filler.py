@@ -5,9 +5,12 @@ Solo coordina el flujo por página. La lógica de cada tipo de interacción
 vive en app/automation/gforms/. Para agregar soporte a un nuevo tipo de pregunta,
 editar solo el handler correspondiente sin tocar este archivo.
 """
+import logging
 import time
 
 from app.automation.base_filler import BaseFiller
+
+logger = logging.getLogger(__name__)
 from app.automation.navigation.button_detector import click_boton, verificar_envio
 from app.automation.navigation.waits import wait_for_form_ready
 from app.automation.timing import pause_action
@@ -43,9 +46,7 @@ class GoogleFormsFiller(BaseFiller):
         perfil = respuesta_generada.get("_perfil", "?")
         tendencia = respuesta_generada.get("_tendencia", "?")
 
-        print(f"\n{'='*55}")
-        print(f"  ENCUESTA #{numero} | Perfil: {perfil} | Tendencia: {tendencia}")
-        print(f"{'='*55}")
+        logger.info("ENCUESTA #%s | Perfil: %s | Tendencia: %s", numero, perfil, tendencia)
 
         page.goto(url, wait_until="domcontentloaded")
         wait_for_form_ready(page, url, runtime_config)
@@ -61,7 +62,7 @@ class GoogleFormsFiller(BaseFiller):
         submit_clicked = False
         aborted = False
         for pag_idx, pagina in enumerate(paginas):
-            print(f"  [Pag {pag_idx + 1}/{len(paginas)}]")
+            logger.debug("Pág %s/%s", pag_idx + 1, len(paginas))
             wait_for_form_ready(page, url, runtime_config)
             submit_clicked, broke = self._fill_page(
                 page, pagina, paginas, pag_idx, url,
@@ -75,7 +76,7 @@ class GoogleFormsFiller(BaseFiller):
             page, url, submit_clicked=submit_clicked, runtime_config=runtime_config
         )
         tiempo = time.time() - inicio
-        print(f"  {'Enviada' if exito else 'No confirmada'}! {_format_time(tiempo)}")
+        logger.info("Encuesta #%s %s en %s", numero, "Enviada" if exito else "No confirmada", _format_time(tiempo))
         return exito, tiempo
 
     # ── flujo por página ───────────────────────────────────────────────────────
@@ -95,7 +96,7 @@ class GoogleFormsFiller(BaseFiller):
             tipo, valor, pregunta = resp["tipo"], resp["valor"], resp["pregunta"]
             opciones = resp.get("opciones_disponibles", [])
             if tipo in TIPOS_NO_LLENABLES:
-                print(f"    SKIP ({tipo}): {pregunta[:50]}")
+                logger.debug("SKIP (%s): %s", tipo, pregunta[:50])
                 continue
 
             fast_container = (
@@ -117,19 +118,18 @@ class GoogleFormsFiller(BaseFiller):
 
             if not filled:
                 failed_questions.append(pregunta)
-                print(f"      No se pudo completar: {pregunta[:60]}")
+                logger.debug("No se pudo completar: %s", pregunta[:60])
 
         if escalas_pendientes:
-            print(f"    Respondiendo {len(escalas_pendientes)} escalas...")
+            logger.debug("Respondiendo %s escalas...", len(escalas_pendientes))
             done = self._special.fill_scales(page, escalas_pendientes, runtime_config)
             if done < len(escalas_pendientes):
                 failed_questions.append(f"Escalas pendientes ({len(escalas_pendientes) - done})")
 
         if failed_questions:
             preview = "; ".join(q[:50] for q in failed_questions[:4])
-            print(f"    [Google] {len(failed_questions)} respuesta(s) no llenadas")
-            if preview:
-                print(f"    [Google] Fallidas: {preview}")
+            logger.warning("[Google] %s respuesta(s) no llenadas. Fallidas: %s",
+                           len(failed_questions), preview or "—")
             if "Enviar" not in pagina.get("botones", []):
                 return False, True
 
@@ -140,7 +140,7 @@ class GoogleFormsFiller(BaseFiller):
             if not advanced and next_idx < len(paginas):
                 advanced = self._matches_expected_page(page, paginas[next_idx], runtime_config)
             if not advanced:
-                print("    [Google] No se pudo avanzar de página.")
+                logger.warning("[Google] No se pudo avanzar de página.")
                 return False, True
             if next_idx < len(paginas) and paginas[next_idx].get("respuestas"):
                 self._skip_informational_pages(page, url, runtime_config)
@@ -155,13 +155,13 @@ class GoogleFormsFiller(BaseFiller):
     def _fill_question(self, page, tipo: str, valor, pregunta: str,
                        container, escalas_pendientes: list, runtime_config, opciones: list | None = None) -> bool:
         """Delega el llenado al handler correcto según el tipo de pregunta."""
+        logger.debug("%s: %s", pregunta[:50], str(valor)[:60] if tipo != "matriz" else "(matriz)")
+
         if tipo == "opcion_multiple":
-            print(f"    {pregunta[:50]}: {valor}")
             fn = self._clicker.click_otro if str(valor).startswith("Otro") else self._clicker.click
             return fn(page, valor, "radio", container, pregunta=pregunta, runtime_config=runtime_config)
 
         if tipo == "seleccion_multiple":
-            print(f"    {pregunta[:50]}: {valor}")
             valores = valor if isinstance(valor, list) else [valor]
             ok = True
             for item_val in valores:
@@ -171,11 +171,9 @@ class GoogleFormsFiller(BaseFiller):
             return ok
 
         if tipo == "parrafo":
-            print(f"    {pregunta[:50]}: {str(valor)[:50]}...")
             return self._writer.write_paragraph(page, valor, container)
 
         if tipo in ("texto", "numero"):
-            print(f"    {pregunta[:50]}: {valor}")
             return self._writer.write(page, valor, container, pregunta=pregunta, tipo=tipo)
 
         if tipo == "escala_lineal":
@@ -183,22 +181,17 @@ class GoogleFormsFiller(BaseFiller):
             return True
 
         if tipo == "desplegable":
-            print(f"    {pregunta[:50]}: {valor}")
             return self._dropdown.select(page, pregunta, valor, container, runtime_config=runtime_config)
 
         if tipo == "fecha":
-            print(f"    {pregunta[:50]}: {valor}")
             return self._special.fill_date(page, valor, container, text_writer=self._writer, runtime_config=runtime_config)
 
         if tipo == "hora":
-            print(f"    {pregunta[:50]}: {valor}")
             return self._special.fill_time(page, valor, container, runtime_config=runtime_config)
 
         if tipo in ("matriz", "matriz_checkbox"):
-            print(f"    {pregunta[:50]}: (matriz)")
             return self._special.fill_matrix(page, valor, tipo, container, runtime_config=runtime_config, opciones=opciones or [])
 
-        print(f"    {pregunta[:50]} ({tipo}): {valor}")
         return self._writer.write(page, valor, container, pregunta=pregunta, tipo=tipo)
 
     # ── navegación ─────────────────────────────────────────────────────────────
@@ -216,7 +209,7 @@ class GoogleFormsFiller(BaseFiller):
                     return
                 if page.locator('span:has-text("Siguiente"), [role="button"]:has-text("Siguiente")').count() == 0:
                     return
-                print("    [Google] Página intro sin preguntas -> clic en Siguiente")
+                logger.debug("[Google] Página intro sin preguntas -> clic en Siguiente")
                 if not click_boton(page, "Siguiente", url, runtime_config=runtime_config):
                     return
                 wait_for_form_ready(page, url, runtime_config)
@@ -257,7 +250,7 @@ class GoogleFormsFiller(BaseFiller):
                 has_inputs = page.locator(input_selector).count() > 0
                 has_next = page.locator('span:has-text("Siguiente"), [role="button"]:has-text("Siguiente")').count() > 0
                 if not has_inputs and has_next:
-                    print("    [Google] Avance confirmado por página informativa.")
+                    logger.debug("[Google] Avance confirmado por página informativa.")
                     return True
             except Exception:
                 pass
@@ -273,7 +266,7 @@ class GoogleFormsFiller(BaseFiller):
                 fresh_items = []
 
             if self._finder.find(page, pregunta, fresh_items, runtime_config):
-                print(f"    [Google] Avance confirmado por estructura: {pregunta[:50]}")
+                logger.debug("[Google] Avance confirmado por estructura: %s", pregunta[:50])
                 return True
 
             try:
@@ -281,7 +274,7 @@ class GoogleFormsFiller(BaseFiller):
             except Exception:
                 page_text = ""
             if pregunta.lower() in str(page_text).lower():
-                print(f"    [Google] Avance confirmado por texto visible: {pregunta[:50]}")
+                logger.debug("[Google] Avance confirmado por texto visible: %s", pregunta[:50])
                 return True
 
         return False

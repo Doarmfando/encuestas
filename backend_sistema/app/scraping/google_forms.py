@@ -3,12 +3,16 @@ Scraper especializado para Google Forms.
 Combina múltiples estrategias: FB_DATA, Playwright y HTML fallback.
 """
 from copy import deepcopy
+import logging
 import re
 import time
+
 from playwright.sync_api import sync_playwright
 
 _NUMBERING_RE = re.compile(r'^\d+[\.\)\-]+\s*')
 _WHITESPACE_RE = re.compile(r'\s+')
+
+logger = logging.getLogger(__name__)
 
 from app.constants.question_types import TIPO_INFORMATIVO, TIPO_MATRIZ, TIPO_MATRIZ_CHECKBOX
 from app.scraping.base_scraper import BaseScraper
@@ -52,18 +56,18 @@ class GoogleFormsScraper(BaseScraper):
             resultado_fb = self.fb_strategy.extract(html, resultado["url"])
 
             # ============ ESTRATEGIA 2: Navegación Playwright ============
-            print("  [Playwright] Navegación directa...")
+            logger.info("[Playwright] Navegando formulario...")
             resultado_pw = self.pw_strategy.extract(page, resultado["url"])
-            print(f"    -> {resultado_pw['total_preguntas']} preguntas en {len(resultado_pw['paginas'])} páginas")
+            logger.info("[Playwright] %s preguntas en %s páginas",
+                        resultado_pw["total_preguntas"], len(resultado_pw["paginas"]))
 
             browser.close()
 
         # ============ COMBINAR RESULTADOS ============
         resultado = self._combinar_estrategias(resultado_fb, resultado_pw, html, resultado)
 
-        print(f"\n  Scraping completado:")
-        print(f"    Páginas: {len(resultado['paginas'])}")
-        print(f"    Preguntas: {resultado['total_preguntas']}")
+        logger.info("Scraping completado: %s páginas, %s preguntas",
+                    len(resultado["paginas"]), resultado["total_preguntas"])
 
         return resultado
 
@@ -79,18 +83,15 @@ class GoogleFormsScraper(BaseScraper):
             fb_ok = self._is_structurally_complete(resultado_fb)
             pw_ok = self._is_structurally_complete(resultado_pw)
 
-            print(
-                "\n  Comparando: "
-                f"FB_DATA={fb_preguntas}preg/{fb_paginas}pág/score={fb_score} "
-                f"vs Playwright={pw_preguntas}preg/{pw_paginas}pág/score={pw_score}"
-            )
+            logger.info("Comparando: FB=%spreg/%spág/score=%s vs PW=%spreg/%spág/score=%s",
+                        fb_preguntas, fb_paginas, fb_score, pw_preguntas, pw_paginas, pw_score)
 
             if fb_ok and not pw_ok:
                 resultado = self._merge_metadata(deepcopy(resultado_fb), resultado_pw)
-                print("  -> FB_DATA como base estructuralmente completa; Playwright queda de apoyo")
+                logger.info("Usando FB_DATA como base (estructuralmente completa)")
             elif pw_ok and not fb_ok:
                 resultado = self._merge_metadata(deepcopy(resultado_pw), resultado_fb)
-                print("  -> Playwright como base estructuralmente completa; FB_DATA incompleto")
+                logger.info("Usando Playwright como base (FB_DATA incompleto)")
             else:
                 principal, secundario, principal_nombre = (
                     (resultado_fb, resultado_pw, "FB_DATA")
@@ -99,16 +100,15 @@ class GoogleFormsScraper(BaseScraper):
                 )
                 resultado = self._combinar_resultados(deepcopy(principal), secundario)
                 resultado = self._merge_metadata(resultado, secundario)
-                print(f"  -> {principal_nombre} como base por score estructural")
+                logger.info("Usando %s como base por score estructural", principal_nombre)
         elif resultado_fb:
             resultado = resultado_fb
-            print(f"\n  Usando solo FB_DATA")
+            logger.info("Usando solo FB_DATA")
         elif resultado_pw["total_preguntas"] > 0:
             resultado = resultado_pw
-            print(f"\n  Usando solo Playwright")
+            logger.info("Usando solo Playwright")
         else:
-            # Fallback: parsing HTML directo
-            print("\n  Ningún método capturó preguntas, usando fallback HTML...")
+            logger.info("Ningún método capturó preguntas, usando fallback HTML...")
             html_result = self.html_strategy.extract(html, resultado_base["url"])
             resultado = html_result if html_result else resultado_base
 
@@ -280,7 +280,7 @@ class GoogleFormsScraper(BaseScraper):
                 huerfanas_reales.append(preg)
 
         if huerfanas_reales:
-            print(f"    {len(huerfanas_reales)} preguntas hu?rfanas de FB_DATA agregadas a ?ltima p?gina")
+            logger.debug("%s preguntas huérfanas de FB_DATA agregadas a última página", len(huerfanas_reales))
             if paginas_finales:
                 paginas_finales[-1]["preguntas"].extend(huerfanas_reales)
             else:
@@ -319,7 +319,7 @@ class GoogleFormsScraper(BaseScraper):
                     preguntas_extra.append(preg)
 
         if preguntas_extra:
-            print(f"    Combinando: {len(preguntas_extra)} preguntas extra del método secundario")
+            logger.debug("Combinando: %s preguntas extra del método secundario", len(preguntas_extra))
             if principal["paginas"]:
                 idx = max(0, len(principal["paginas"]) - 1)
                 nueva_pagina = {

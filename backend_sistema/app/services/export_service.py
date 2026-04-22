@@ -1,9 +1,13 @@
 """
 Servicio de exportación a Excel.
 """
+import logging
 import os
 from datetime import datetime
+
 from openpyxl import Workbook
+
+logger = logging.getLogger(__name__)
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 
@@ -104,7 +108,7 @@ class ExportService:
         nombre = f"encuestas_{timestamp}.xlsx"
         ruta = os.path.join(export_dir, nombre)
         wb.save(ruta)
-        print(f"\n  Excel: {nombre}")
+        logger.info("Excel exportado: %s", nombre)
 
         return os.path.abspath(ruta)
 

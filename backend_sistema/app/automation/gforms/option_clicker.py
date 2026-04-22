@@ -3,12 +3,16 @@ Click en opciones radio/checkbox de Google Forms.
 Solo responsabilidad: hacer clic en la opción correcta y verificar la selección.
 Para agregar un nuevo fallback de click: agregar un lambda en _click_control o _click_text_node.
 """
+import logging
+
 from app.automation.gforms._base import (
     normalize_match_text, prepare_scope, is_control_selected,
     score_option_candidate, click_control,
 )
 from app.automation.gforms.question_finder import QuestionFinder
 from app.automation.timing import pause_action
+
+logger = logging.getLogger(__name__)
 
 
 class OptionClicker:
@@ -47,7 +51,7 @@ class OptionClicker:
         if self._click_unique_on_page(page, target, role, runtime_config):
             return True
 
-        print(f"      No encontré {role}: '{str(texto_opcion).strip()[:40]}'")
+        logger.debug("No se encontró %s: '%s'", role, str(texto_opcion).strip()[:40])
         return False
 
     def click_otro(

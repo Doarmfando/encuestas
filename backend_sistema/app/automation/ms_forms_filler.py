@@ -2,7 +2,11 @@
 Llenador específico para Microsoft Forms.
 Usa FillingStrategies compartidas + selectores específicos de MS Forms.
 """
+import logging
+
 from app.automation.filling_strategies import FillingStrategies
+
+logger = logging.getLogger(__name__)
 from app.utils.text_normalizer import normalize_for_key as _normalize_text
 from app.utils.fuzzy_matcher import similarity as _similarity
 from app.automation.navigation.waits import capture_page_state, wait_for_form_ready, wait_for_post_action, wait_for_submission_signal
@@ -57,7 +61,7 @@ class MSFormsFiller:
         }
 
         if not wait_for_form_ready(page, page.url, runtime_config):
-            print("    [MS] No se encontró #question-list")
+            logger.warning("[MS] No se encontró #question-list")
             result["failed"] = 1
             result["failed_questions"].append("__page__")
             return result
@@ -69,7 +73,7 @@ class MSFormsFiller:
 
             container = self._find_question(page, resp_idx, pregunta)
             if not container:
-                print(f"    [MS] No encontré: {pregunta[:50]}")
+                logger.debug("[MS] No encontré: %s", pregunta[:50])
                 result["failed"] += 1
                 result["failed_questions"].append(pregunta)
                 continue
@@ -77,10 +81,10 @@ class MSFormsFiller:
             filled = self._fill_element(container, page, tipo, valor, pregunta, runtime_config=runtime_config)
 
             if filled:
-                print(f"    OK: {pregunta[:50]}")
+                logger.debug("OK: %s", pregunta[:50])
                 result["filled"] += 1
             else:
-                print(f"    FALLÓ: {pregunta[:50]}")
+                logger.warning("FALLÓ: %s", pregunta[:50])
                 result["failed"] += 1
                 result["failed_questions"].append(pregunta)
 
@@ -203,7 +207,7 @@ class MSFormsFiller:
         """Redirige al método correcto según el tipo de pregunta."""
         try:
             if tipo in TIPOS_NO_LLENABLES:
-                print(f"    [MS] SKIP ({tipo}): {pregunta[:40]}")
+                logger.debug("[MS] SKIP (%s): %s", tipo, pregunta[:40])
                 return True
 
             if tipo == "texto":
@@ -255,7 +259,7 @@ class MSFormsFiller:
                 return fs.auto_detect_and_fill(container, page, valor, use_js_click=True, runtime_config=runtime_config)
 
         except Exception as e:
-            print(f"    [MS] Error {tipo}: {e}")
+            logger.warning("[MS] Error %s: %s", tipo, e)
             return False
 
     # ========== MS-SPECIFIC: RATING ==========
@@ -350,7 +354,7 @@ class MSFormsFiller:
                     btn.scroll_into_view_if_needed()
                     pause_action(runtime_config, multiplier=0.8)
                     btn.click()
-                    print(f"    Botón 'Enviar' clickeado ({sel[:40]})")
+                    logger.debug("Botón 'Enviar' clickeado (%s)", sel[:40])
                     clicked = True
                     break
             except Exception:
@@ -373,18 +377,18 @@ class MSFormsFiller:
                     }
                 """)
                 if clicked:
-                    print("    Botón 'Enviar' clickeado (js)")
+                    logger.debug("Botón 'Enviar' clickeado (js)")
             except Exception:
                 pass
 
         if not clicked:
-            print("    No se encontró botón de enviar")
+            logger.warning("No se encontró botón de enviar")
             return False
 
         wait_for_post_action(page, before_state, url, runtime_config, after_submit=True)
         enviado = wait_for_submission_signal(page, url, runtime_config, submit_clicked=True)
         if enviado:
-            print("    Confirmación de envío detectada")
+            logger.debug("Confirmación de envío detectada")
         else:
-            print("    No se confirmó el envío dentro de la ventana rápida")
+            logger.debug("No se confirmó el envío dentro de la ventana rápida")
         return enviado

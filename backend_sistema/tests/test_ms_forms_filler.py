@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from app.automation.generic_filler import GenericFiller
+from app.automation.microsoft_forms_filler import MicrosoftFormsFiller
 from app.automation.ms_forms_filler import MSFormsFiller
 
 
@@ -51,10 +51,10 @@ class MSFormsFillerTest(unittest.TestCase):
         self.assertEqual(result["failed"], 0)
 
 
-class GenericFillerMicrosoftFlowTest(unittest.TestCase):
-    @patch("app.automation.generic_filler.wait_for_form_ready", return_value=True)
+class MicrosoftFormsFillerFlowTest(unittest.TestCase):
+    @patch("app.automation.microsoft_forms_filler.wait_for_form_ready", return_value=True)
     def test_ms_flow_does_not_advance_when_page_fill_fails(self, _wait_ready):
-        filler = GenericFiller()
+        filler = MicrosoftFormsFiller()
         filler.ms_filler.fill_page = Mock(return_value={
             "ok": False,
             "filled": 0,

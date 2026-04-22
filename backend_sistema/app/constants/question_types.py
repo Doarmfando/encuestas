@@ -48,6 +48,39 @@ TIPOS_OPCIONES = frozenset({
 })
 
 
+# ============ PATRONES LIKERT ============
+# Fuente única de verdad. Usado por survey_preparator.es_escala y response_generator._es_likert.
+PATRONES_LIKERT = [
+    {"nunca", "casi nunca", "a veces", "muchas veces", "siempre"},
+    {"nunca", "raramente", "a veces", "frecuentemente", "siempre"},
+    {"muy en desacuerdo", "en desacuerdo", "neutral", "de acuerdo", "muy de acuerdo"},
+    {"totalmente en desacuerdo", "en desacuerdo", "ni de acuerdo ni en desacuerdo", "de acuerdo", "totalmente de acuerdo"},
+    {"nada", "poco", "algo", "bastante", "mucho"},
+    {"never", "rarely", "sometimes", "often", "always"},
+]
+
+# ============ CONJUNTOS DE VALIDACIÓN ============
+# Tipos válidos al guardar estructura manual.
+TIPOS_MANUALES_VALIDOS = frozenset({
+    TIPO_TEXTO, TIPO_PARRAFO, TIPO_NUMERO,
+    TIPO_OPCION_MULTIPLE, TIPO_SELECCION_MULTIPLE,
+    TIPO_ESCALA_LINEAL, TIPO_DESPLEGABLE,
+    TIPO_FECHA, TIPO_HORA,
+    TIPO_MATRIZ, TIPO_MATRIZ_CHECKBOX,
+    TIPO_LIKERT, TIPO_NPS, TIPO_RANKING,
+    TIPO_ARCHIVO, TIPO_IMAGEN, TIPO_INFORMATIVO,
+    TIPO_SECCION, TIPO_DESCONOCIDO,
+})
+
+# Tipos que necesitan al menos una opción para poder llenarse.
+TIPOS_REQUIEREN_OPCIONES = frozenset({
+    TIPO_OPCION_MULTIPLE, TIPO_SELECCION_MULTIPLE,
+    TIPO_DESPLEGABLE, TIPO_ESCALA_LINEAL,
+    TIPO_MATRIZ, TIPO_MATRIZ_CHECKBOX,
+    TIPO_LIKERT, TIPO_NPS, TIPO_RANKING,
+})
+
+
 # ============ MAPEO GOOGLE FORMS ============
 # Google Forms usa un número entero (item[3]) para identificar el tipo.
 

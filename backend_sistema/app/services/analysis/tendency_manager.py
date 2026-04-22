@@ -3,11 +3,8 @@ Gestión de tendencias de escala Likert y sus distribuciones.
 Solo responsabilidad: crear, corregir y normalizar tendencias.
 Para agregar una nueva distribución predefinida (ej. 'bimodal'): solo editar aquí.
 """
+from app.constants.limits import MIN_TENDENCIAS, MAX_TENDENCIAS
 from app.services.analysis.response_normalizer import ajustar_suma_exacta
-
-
-MIN_TENDENCIAS = 3
-MAX_TENDENCIAS = 4
 
 
 class TendencyManager:

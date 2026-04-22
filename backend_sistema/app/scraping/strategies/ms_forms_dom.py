@@ -3,7 +3,10 @@ Estrategia DOM para Microsoft Forms: extrae estructura desde el DOM renderizado.
 Usado como último fallback cuando la API interna no responde.
 Para agregar soporte a un nuevo tipo de pregunta del DOM: agregar bloque en _detect_tipo.
 """
+import logging
 import time
+
+logger = logging.getLogger(__name__)
 
 
 class MicrosoftFormsDOMStrategy:
@@ -53,7 +56,7 @@ class MicrosoftFormsDOMStrategy:
                 "plataforma": "microsoft_forms",
             }
         except Exception as e:
-            print(f"  [MS Forms DOM] Error: {e}")
+            logger.warning("[MS Forms DOM] Error: %s", e)
             return None
 
     @staticmethod

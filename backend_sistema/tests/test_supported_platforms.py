@@ -10,6 +10,7 @@ from app.automation.navigation.selectors import (
 from app.database.connection import db
 from app.database.models import Project
 from app.services.execution_service import ExecutionService
+from app.services.execution.browser_manager import BrowserManager
 
 
 class SupportedPlatformsTest(unittest.TestCase):
@@ -107,10 +108,10 @@ class SupportedPlatformsTest(unittest.TestCase):
         )
 
     def test_execution_service_rejects_unsupported_platform(self):
-        service = ExecutionService()
+        manager = BrowserManager()
 
         with self.assertRaises(ValueError):
-            service._get_filler("https://typeform.com/to/demo")
+            manager.get_filler("https://typeform.com/to/demo")
 
 
 if __name__ == "__main__":

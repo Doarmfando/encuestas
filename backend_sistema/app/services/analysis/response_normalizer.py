@@ -3,7 +3,11 @@ Normalización y corrección de respuestas que devuelve la IA.
 Solo responsabilidad: convertir cualquier formato de respuesta IA al formato
 interno correcto. Para agregar soporte a un nuevo tipo de respuesta: solo editar aquí.
 """
+import logging
+
 from app.utils.fuzzy_matcher import find_best_match, map_keys_fuzzy, similarity
+
+logger = logging.getLogger(__name__)
 
 
 _TIPO_ALIASES: dict[str, str] = {
@@ -45,7 +49,7 @@ class ResponseNormalizer:
             if mejor_match:
                 ratio = similarity(texto_ia, mejor_match)
                 if ratio < 1.0:
-                    print(f"    [~] Corregido: '{texto_ia[:30]}' → '{mejor_match[:30]}' ({ratio:.0%})")
+                    logger.debug("[~] Corregido: '%s' -> '%s' (%.0f%%)", texto_ia[:30], mejor_match[:30], ratio * 100)
                 corregidas[mejor_match] = config
             else:
                 corregidas[texto_ia] = config

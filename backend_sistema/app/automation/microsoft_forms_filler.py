@@ -1,19 +1,23 @@
 """
-Orquestador auxiliar para Microsoft Forms.
+Llenador de formularios Microsoft Forms.
+Para agregar soporte a un nuevo tipo de campo: implementar en ms_forms_filler.py.
 """
+import logging
 import time
 
 from app.automation.base_filler import BaseFiller
+
+logger = logging.getLogger(__name__)
 from app.automation.ms_forms_filler import MSFormsFiller
 from app.automation.navigation.button_detector import verificar_envio
 from app.automation.navigation.selectors import detectar_plataforma
 from app.automation.navigation.waits import wait_for_form_ready
 
 
-class GenericFiller(BaseFiller):
-    """Llena Microsoft Forms reutilizando estrategias compartidas."""
+class MicrosoftFormsFiller(BaseFiller):
+    """Llena Microsoft Forms delegando el llenado por página a MSFormsFiller."""
 
-    def __init__(self, ai_service=None):
+    def __init__(self):
         self.ms_filler = MSFormsFiller()
 
     def fill_form(
@@ -24,16 +28,13 @@ class GenericFiller(BaseFiller):
         numero: int,
         runtime_config: dict | None = None,
     ) -> tuple[bool, float]:
-        """Llena un formulario Microsoft Forms."""
         inicio = time.time()
         perfil = respuesta_generada.get("_perfil", "?")
         platform = detectar_plataforma(url)
         if platform["name"] != "microsoft_forms":
-            raise ValueError("GenericFiller solo soporta Microsoft Forms en la ruta activa.")
+            raise ValueError("MicrosoftFormsFiller solo soporta Microsoft Forms.")
 
-        print(f"\n{'='*55}")
-        print(f"  ENCUESTA #{numero} | {platform['name']} | Perfil: {perfil}")
-        print(f"{'='*55}")
+        logger.info("ENCUESTA #%s | %s | Perfil: %s", numero, platform["name"], perfil)
 
         page.goto(url, wait_until="domcontentloaded")
         wait_for_form_ready(page, url, runtime_config)
@@ -43,7 +44,7 @@ class GenericFiller(BaseFiller):
         ms_page_failed = False
 
         for pag_idx, pagina in enumerate(paginas):
-            print(f"  [Pág {pag_idx + 1}/{len(paginas)}]")
+            logger.debug("Pág %s/%s", pag_idx + 1, len(paginas))
             wait_for_form_ready(page, url, runtime_config)
             respuestas = pagina.get("respuestas", [])
             botones = pagina.get("botones", [])
@@ -53,12 +54,7 @@ class GenericFiller(BaseFiller):
                 ms_page_failed = True
                 failed = ms_result.get("failed_questions", [])
                 preview = "; ".join(q[:50] for q in failed[:3])
-                print(f"    [MS] Abortando pagina: {ms_result.get('failed', 0)} pregunta(s) no se llenaron")
-                if preview:
-                    print(f"    [MS] Fallidas: {preview}")
-                break
-
-            if ms_page_failed:
+                logger.warning("[MS] Abortando pagina: %s pregunta(s) no llenadas. Fallidas: %s", ms_result.get("failed", 0), preview or "—")
                 break
 
             if "Siguiente" in botones:
@@ -75,6 +71,6 @@ class GenericFiller(BaseFiller):
         tiempo = time.time() - inicio
 
         status = "Enviada" if exito else "No confirmada"
-        print(f"  {status}! {tiempo:.1f}s")
+        logger.info("Encuesta #%s %s en %.1fs", numero, status, tiempo)
 
         return exito, tiempo

@@ -3,9 +3,12 @@ Estrategia de scraping: API interna de Microsoft Forms.
 Para agregar soporte a un nuevo tipo de pregunta de la API: editar _parse_question_extras.
 Para cambiar la lógica DOM (fallback): editar ms_forms_dom.py.
 """
+import logging
 import re
 import json
 import requests
+
+logger = logging.getLogger(__name__)
 
 from app.constants.question_types import (
     map_ms_forms_type,
@@ -65,20 +68,20 @@ class MicrosoftFormsStrategy:
         if html:
             result = self._extract_via_api(html, url)
             if result and result["total_preguntas"] > 0:
-                print(f"  [MS Forms API] Extraídas {result['total_preguntas']} preguntas")
+                logger.info("[MS Forms API] Extraídas %s preguntas", result["total_preguntas"])
                 return result
 
         if page and not html:
             html = page.content()
             result = self._extract_via_api(html, url)
             if result and result["total_preguntas"] > 0:
-                print(f"  [MS Forms API] Extraídas {result['total_preguntas']} preguntas")
+                logger.info("[MS Forms API] Extraídas %s preguntas", result["total_preguntas"])
                 return result
 
         if page:
             result = self._dom_strategy.extract(page)
             if result and result["total_preguntas"] > 0:
-                print(f"  [MS Forms DOM] Extraídas {result['total_preguntas']} preguntas")
+                logger.info("[MS Forms DOM] Extraídas %s preguntas", result["total_preguntas"])
                 return result
 
         return None
@@ -89,21 +92,21 @@ class MicrosoftFormsStrategy:
         try:
             api_url = self._find_api_url(html)
             if not api_url:
-                print("  [MS Forms API] No se encontró API URL en el HTML")
+                logger.debug("[MS Forms API] No se encontró API URL en el HTML")
                 return None
 
-            print("  [MS Forms API] URL encontrada, consultando...")
+            logger.info("[MS Forms API] URL encontrada, consultando...")
             resp = requests.get(api_url, timeout=15, headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 "Accept": "application/json",
             })
             if resp.status_code != 200:
-                print(f"  [MS Forms API] Status {resp.status_code}")
+                logger.warning("[MS Forms API] Status %s", resp.status_code)
                 return None
 
             return self._parse_api_response(resp.json(), original_url)
         except Exception as e:
-            print(f"  [MS Forms API] Error: {e}")
+            logger.warning("[MS Forms API] Error: %s", e)
             return None
 
     @staticmethod
@@ -187,7 +190,7 @@ class MicrosoftFormsStrategy:
                 "plataforma": "microsoft_forms",
             }
         except Exception as e:
-            print(f"  [MS Forms] Error parseando API response: {e}")
+            logger.warning("[MS Forms] Error parseando API response: %s", e)
             return None
 
     @staticmethod

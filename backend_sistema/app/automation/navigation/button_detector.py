@@ -1,9 +1,12 @@
 """
 Deteccion de botones de navegacion con multiples estrategias.
 """
+import logging
 import time
 
 from app.automation.navigation.selectors import detectar_plataforma, GENERIC
+
+logger = logging.getLogger(__name__)
 from app.automation.navigation.waits import (
     capture_page_state,
     has_success_signal,
@@ -85,10 +88,7 @@ def click_boton(page, nombre: str, url: str = "", runtime_config: dict | None = 
                     btn.scroll_into_view_if_needed()
                     btn.click()
                     changed = wait_for_post_action(page, before_state, url, runtime_config, after_submit=after_submit)
-                    print(
-                        f"    Boton '{texto}' clickeado (role-button)"
-                        if changed else f"    Boton '{texto}' clickeado pero no hubo cambio de pagina (role-button)"
-                    )
+                    _log_click(texto, "role-button", changed)
                     return changed
 
             clicked = page.evaluate(f'''() => {{
@@ -103,10 +103,7 @@ def click_boton(page, nombre: str, url: str = "", runtime_config: dict | None = 
             }}''')
             if clicked:
                 changed = wait_for_post_action(page, before_state, url, runtime_config, after_submit=after_submit)
-                print(
-                    f"    Boton '{texto}' clickeado (js)"
-                    if changed else f"    Boton '{texto}' clickeado pero no hubo cambio de pagina (js)"
-                )
+                _log_click(texto, "js", changed)
                 return changed
 
             try:
@@ -114,10 +111,7 @@ def click_boton(page, nombre: str, url: str = "", runtime_config: dict | None = 
                 if span.is_visible():
                     span.click()
                     changed = wait_for_post_action(page, before_state, url, runtime_config, after_submit=after_submit)
-                    print(
-                        f"    Boton '{texto}' clickeado (span)"
-                        if changed else f"    Boton '{texto}' clickeado pero no hubo cambio de pagina (span)"
-                    )
+                    _log_click(texto, "span", changed)
                     return changed
             except Exception:
                 pass
@@ -127,10 +121,7 @@ def click_boton(page, nombre: str, url: str = "", runtime_config: dict | None = 
                 if btn_html.is_visible():
                     btn_html.click()
                     changed = wait_for_post_action(page, before_state, url, runtime_config, after_submit=after_submit)
-                    print(
-                        f"    Boton '{texto}' clickeado (button html)"
-                        if changed else f"    Boton '{texto}' clickeado pero no hubo cambio de pagina (button html)"
-                    )
+                    _log_click(texto, "button-html", changed)
                     return changed
             except Exception:
                 pass
@@ -140,10 +131,7 @@ def click_boton(page, nombre: str, url: str = "", runtime_config: dict | None = 
                 if submit.is_visible():
                     submit.click()
                     changed = wait_for_post_action(page, before_state, url, runtime_config, after_submit=after_submit)
-                    print(
-                        f"    Boton '{texto}' clickeado (input submit)"
-                        if changed else f"    Boton '{texto}' clickeado pero no hubo cambio de pagina (input submit)"
-                    )
+                    _log_click(texto, "input-submit", changed)
                     return changed
             except Exception:
                 pass
@@ -162,20 +150,17 @@ def click_boton(page, nombre: str, url: str = "", runtime_config: dict | None = 
                             btn.scroll_into_view_if_needed()
                             btn.click(force=True)
                             changed = wait_for_post_action(page, before_state, url, runtime_config, after_submit=after_submit)
-                            print(
-                                f"    Boton '{texto}' clickeado (text-node)"
-                                if changed else f"    Boton '{texto}' clickeado pero no hubo cambio de pagina (text-node)"
-                            )
+                            _log_click(texto, "text-node", changed)
                             return changed
                     except Exception:
                         continue
             except Exception:
                 pass
 
-        print(f"    No encontre boton '{nombre}'")
+        logger.debug("No se encontró botón '%s'", nombre)
         return False
     except Exception as e:
-        print(f"    Error boton '{nombre}': {e}")
+        logger.warning("Error al hacer click en botón '%s': %s", nombre, e)
         return False
 
 
@@ -195,6 +180,13 @@ def verificar_envio(page, url: str = "", submit_clicked: bool = False, runtime_c
     if has_success_signal(page, url, submit_clicked=submit_clicked):
         return True
     return wait_for_submission_signal(page, url, runtime_config, submit_clicked=submit_clicked)
+
+
+def _log_click(texto: str, strategy: str, changed: bool) -> None:
+    if changed:
+        logger.debug("Botón '%s' clickeado (%s)", texto, strategy)
+    else:
+        logger.debug("Botón '%s' clickeado (%s) pero no hubo cambio de página", texto, strategy)
 
 
 def _hay_boton_visible(page, textos: list[str]) -> bool:

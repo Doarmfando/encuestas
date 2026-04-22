@@ -2,8 +2,11 @@
 Estrategia de scraping: Parsing HTML directo.
 Fallback que no requiere Playwright - parsea el HTML con regex.
 """
+import logging
 import re
 import json
+
+logger = logging.getLogger(__name__)
 
 
 class RequestsHTMLStrategy:
@@ -25,7 +28,7 @@ class RequestsHTMLStrategy:
             "plataforma": "google_forms",
         }
 
-        print("  [HTML Fallback] Parseando HTML directo...")
+        logger.info("[HTML Fallback] Parseando HTML directo...")
 
         # Extraer título
         titulo_match = re.search(r'<meta property="og:title" content="([^"]+)"', html)

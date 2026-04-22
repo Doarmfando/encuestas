@@ -2,8 +2,12 @@
 Click en opciones radio/checkbox de cualquier plataforma.
 Para agregar una nueva estrategia de matching: añadir bloque en click_option_by_text.
 """
+import logging
+
 from app.automation.timing import pause_action
 from app.utils.text_normalizer import normalize_for_matching as _norm_text
+
+logger = logging.getLogger(__name__)
 
 
 class OptionClicker:
@@ -102,10 +106,7 @@ class OptionClicker:
             if 0 <= idx < count:
                 return OptionClicker._click_at_index(inputs, page, idx, use_js_click, runtime_config=runtime_config)
 
-        try:
-            print(f"      [debug] No match '{valor}' entre: {option_texts}")
-        except Exception:
-            pass
+        logger.debug("No match '%s' entre: %s", valor, option_texts)
         return False
 
     @staticmethod

@@ -1,10 +1,20 @@
 """
 Servicio de IA - Factory y gestión de proveedores.
+Para registrar un nuevo proveedor: añadir una entrada en _PROVIDER_REGISTRY.
 """
+import logging
 from flask import current_app
 from app.ai.provider import AIProvider
 from app.ai.openai_provider import OpenAIProvider
 from app.ai.anthropic_provider import AnthropicProvider
+
+logger = logging.getLogger(__name__)
+
+# Registry OCP: agregar nuevo proveedor = una línea aquí.
+_PROVIDER_REGISTRY: dict[str, tuple[type, str]] = {
+    "openai": (OpenAIProvider, "gpt-4o"),
+    "anthropic": (AnthropicProvider, "claude-sonnet-4-20250514"),
+}
 
 
 class AIService:
@@ -20,27 +30,24 @@ class AIService:
             self._setup_from_config(app.config)
 
     def _setup_from_config(self, config):
-        """Configura proveedores desde la configuración."""
-        # OpenAI
-        openai_key = config.get("OPENAI_API_KEY", "")
-        if openai_key:
-            self._providers["openai"] = OpenAIProvider(
-                api_key=openai_key,
-                model=config.get("OPENAI_MODEL", "gpt-4o"),
-            )
-
-        # Anthropic
-        anthropic_key = config.get("ANTHROPIC_API_KEY", "")
-        if anthropic_key:
+        """Configura proveedores desde la configuración usando _PROVIDER_REGISTRY."""
+        key_map = {
+            "openai": ("OPENAI_API_KEY", "OPENAI_MODEL"),
+            "anthropic": ("ANTHROPIC_API_KEY", "ANTHROPIC_MODEL"),
+        }
+        for name, (cls, default_model) in _PROVIDER_REGISTRY.items():
+            api_key_cfg, model_cfg = key_map.get(name, (f"{name.upper()}_API_KEY", f"{name.upper()}_MODEL"))
+            api_key = config.get(api_key_cfg, "")
+            if not api_key:
+                continue
             try:
-                self._providers["anthropic"] = AnthropicProvider(
-                    api_key=anthropic_key,
-                    model=config.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514"),
+                self._providers[name] = cls(
+                    api_key=api_key,
+                    model=config.get(model_cfg, default_model),
                 )
             except ImportError:
-                print("  anthropic package no instalado, proveedor no disponible")
+                logger.warning("Paquete para proveedor '%s' no instalado, no disponible", name)
 
-        # Establecer proveedor activo
         default = config.get("DEFAULT_AI_PROVIDER", "openai")
         if default in self._providers:
             self._active_provider_name = default
@@ -65,18 +72,10 @@ class AIService:
 
     def add_provider(self, name: str, api_key: str, model: str = ""):
         """Agrega o actualiza un proveedor en runtime."""
-        if name == "openai":
-            self._providers["openai"] = OpenAIProvider(
-                api_key=api_key,
-                model=model or "gpt-4o",
-            )
-        elif name == "anthropic":
-            self._providers["anthropic"] = AnthropicProvider(
-                api_key=api_key,
-                model=model or "claude-sonnet-4-20250514",
-            )
-        else:
-            raise ValueError(f"Proveedor '{name}' no soportado")
+        if name not in _PROVIDER_REGISTRY:
+            raise ValueError(f"Proveedor '{name}' no soportado. Disponibles: {list(_PROVIDER_REGISTRY)}")
+        cls, default_model = _PROVIDER_REGISTRY[name]
+        self._providers[name] = cls(api_key=api_key, model=model or default_model)
 
     def list_providers(self) -> list[dict]:
         """Lista proveedores disponibles."""

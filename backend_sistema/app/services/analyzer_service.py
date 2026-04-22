@@ -6,8 +6,11 @@ Para cambiar el comportamiento de cualquier paso, editar el submódulo correspon
 en app/services/analysis/ sin tocar este archivo.
 """
 import json
+import logging
 from app.ai.prompts import PROMPT_SISTEMA_ANALISIS, PROMPT_ANALISIS_ENCUESTA
 from app.services.ai_service import AIService
+
+logger = logging.getLogger(__name__)
 from app.database.models import PromptTemplate
 from app.services.analysis import (
     SurveyPreparator,
@@ -37,16 +40,19 @@ class AnalyzerService:
         resumen = self._preparator.preparar_resumen(estructura_scrapeada)
         preguntas_ref = self._preparator.extraer_preguntas_referencia(estructura_scrapeada)
 
-        print("  Enviando a IA para análisis...")
+        logger.info("Enviando estructura a IA para análisis...")
         try:
             resultado = self._llamar_ia(resumen, instrucciones_extra)
             resultado = self._validar_y_corregir(resultado, preguntas_ref)
-            print(f"  IA generó: {len(resultado.get('perfiles', []))} perfiles, "
-                  f"{len(resultado.get('reglas_dependencia', []))} reglas, "
-                  f"{len(resultado.get('tendencias_escalas', []))} tendencias")
+            logger.info(
+                "IA generó: %d perfiles, %d reglas, %d tendencias",
+                len(resultado.get("perfiles", [])),
+                len(resultado.get("reglas_dependencia", [])),
+                len(resultado.get("tendencias_escalas", [])),
+            )
             return resultado
         except Exception as e:
-            print(f"  Error con IA: {e}")
+            logger.error("Error llamando a IA, usando fallback: %s", e, exc_info=True)
             return self._generar_fallback(estructura_scrapeada, preguntas_ref)
 
     # ── flujo interno ──────────────────────────────────────────────────────────
@@ -61,13 +67,13 @@ class AnalyzerService:
             p_usr = PromptTemplate.query.filter_by(slug="user_analysis").first()
             if p_usr and not p_usr.is_default:
                 user_prompt_tpl = p_usr.contenido
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("No se pudieron cargar prompts personalizados de BD, usando defaults: %s", e)
 
         provider = self.ai.get_provider()
         num_preguntas = len(resumen.get("preguntas", []))
         max_tokens = max(6000, min(16000, num_preguntas * 300))
-        print(f"  Preguntas para perfiles: {num_preguntas}, max_tokens: {max_tokens}")
+        logger.debug("Preguntas para perfiles: %s, max_tokens: %s", num_preguntas, max_tokens)
 
         user_prompt = user_prompt_tpl.format(
             encuesta_json=json.dumps(resumen, ensure_ascii=False, indent=2)
@@ -108,7 +114,7 @@ class AnalyzerService:
                 texto = ref["texto"]
                 if texto not in perfil["respuestas"] and not es_escala(ref["tipo"], ref.get("opciones", [])):
                     perfil["respuestas"][texto] = self._normalizer.generar_respuesta_default(ref)
-                    print(f"    [+] Agregada pregunta faltante: {texto[:40]}...")
+                    logger.debug("[+] Agregada pregunta faltante: %s...", texto[:40])
 
             for texto in list(perfil["respuestas"].keys()):
                 ref = ref_map.get(texto)
@@ -139,7 +145,7 @@ class AnalyzerService:
         return resultado
 
     def _generar_fallback(self, estructura: dict, preguntas_ref: list) -> dict:
-        print("  Usando configuración fallback (sin IA)")
+        logger.info("Usando configuración fallback (sin IA)")
         _, tamaños_escala = self._detectar_escalas(preguntas_ref)
 
         perfiles = self._profile_manager.crear_defaults(preguntas_ref, 3)

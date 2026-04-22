@@ -3,8 +3,12 @@ Escritura de texto en inputs de respuesta corta y párrafo de Google Forms.
 Solo responsabilidad: rellenar campos de texto. Para agregar un nuevo tipo de input
 (ej. contenteditable): agregar un selector en SHORT_ANSWER_INPUT_SELECTORS o un método aquí.
 """
+import logging
 import re
+
 from app.automation.gforms._base import prepare_scope
+
+logger = logging.getLogger(__name__)
 from app.utils.question_inference import (
     NUMERIC_SHORT_ANSWER_INPUT_SELECTORS,
     SHORT_ANSWER_INPUT_SELECTORS,
@@ -38,10 +42,10 @@ class TextWriter:
                     return True
             if container:
                 return self.write(page, valor, None, pregunta=pregunta, tipo=tipo)
-            print("      No encontré campo de respuesta corta")
+            logger.debug("No encontré campo de respuesta corta")
             return False
         except Exception as e:
-            print(f"      Error texto: {e}")
+            logger.debug("Error texto: %s", e)
             return False
 
     def write_paragraph(self, page, valor, container=None) -> bool:
