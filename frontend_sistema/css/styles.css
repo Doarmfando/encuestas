@@ -1,9 +1,0 @@
-/* Main stylesheet - imports all modules */
-@import url('variables.css');
-@import url('layout.css');
-@import url('components.css');
-@import url('perfiles.css');
-@import url('progress.css');
-@import url('modal.css');
-@import url('panels.css');
-@import url('projects.css');
