@@ -102,7 +102,7 @@ SECRET_KEY=cambia-esto-por-una-clave-segura
 
 **Opción A — Script rápido (Windows)**
 
-Desde el explorador de archivos o una terminal, ejecutar:
+Desde el explorador de archivos o una terminal, ejecutar:a
 
 ```bash
 backend_sistema\start.bat
