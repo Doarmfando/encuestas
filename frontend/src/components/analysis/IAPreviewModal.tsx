@@ -19,8 +19,8 @@ export function IAPreviewModal({ projectId, preview, onClose, onApplied }: IAPre
   const totalFreqP = perfiles.reduce((s, p) => s + (p.frecuencia || 0), 0)
   const totalFreqT = tendencias.reduce((s, t) => s + (t.frecuencia || 0), 0)
   const warnings: string[] = []
-  if (perfiles.length < 3 || perfiles.length > 4) warnings.push('Se necesitan entre 3 y 4 perfiles')
-  if (tendencias.length < 3 || tendencias.length > 4) warnings.push('Se necesitan entre 3 y 4 tendencias')
+  if (perfiles.length < 1 || perfiles.length > 4) warnings.push('Se requiere entre 1 y 4 perfiles')
+  if (tendencias.length < 1 || tendencias.length > 4) warnings.push('Se requiere entre 1 y 4 tendencias')
   if (totalFreqP !== 100) warnings.push(`Frecuencia perfiles suma ${totalFreqP}% (debe ser 100%)`)
   if (totalFreqT !== 100) warnings.push(`Frecuencia tendencias suma ${totalFreqT}% (debe ser 100%)`)
 

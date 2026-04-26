@@ -26,7 +26,7 @@ export function ExecutionPanel({ projectId }: ExecutionPanelProps) {
   const { mutate: stop } = useStop(projectId)
   const { data: estado } = useEstado(projectId, true)
 
-  const isRunning = estado?.fase === 'ejecutando' || estado?.status === 'ejecutando'
+  const isRunning = estado?.fase === 'ejecutando'
   const pct = estado && estado.total > 0 ? Math.round(((estado.progreso ?? 0) / estado.total) * 100) : 0
 
   const barColor = () => {

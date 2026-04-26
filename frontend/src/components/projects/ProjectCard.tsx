@@ -1,7 +1,7 @@
-import type { Project } from '../../types'
+import type { ProjectSimple } from '../../types'
 
 interface ProjectCardProps {
-  project: Project
+  project: ProjectSimple
   onOpen: (id: number) => void
   onDelete: (id: number) => void
 }

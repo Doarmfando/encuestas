@@ -1,16 +1,19 @@
-export interface Project {
+export interface ProjectSimple {
   id: number
   nombre: string
-  descripcion: string
   url: string
-  status: 'nuevo' | 'scrapeado' | 'configurado' | 'ejecutando'
+  status: 'nuevo' | 'scrapeado' | 'configurado'
   plataforma: 'google_forms' | 'microsoft_forms' | 'typeform' | 'generic' | null
-  estructura: { paginas: Pagina[] } | null
   total_preguntas: number
-  config_activa: ProjectConfig | null
   total_configs: number
   ultima_ejecucion: EjecucionSimple | null
   created_at: string
+}
+
+export interface Project extends ProjectSimple {
+  descripcion: string
+  estructura: { paginas: Pagina[] } | null
+  config_activa: ProjectConfig | null
 }
 
 export interface Pregunta {
@@ -19,6 +22,7 @@ export interface Pregunta {
   obligatoria: boolean
   opciones?: string[]
   filas?: string[]
+  no_llenar?: boolean
 }
 
 export interface Pagina {
@@ -86,18 +90,31 @@ export interface Execution {
 }
 
 export interface EjecucionSimple {
+  id: number
   status: string
   exitosas: number
+  fallidas: number
   total: number
+  created_at: string
 }
 
-export interface EstadoResponse extends Execution {
-  fase: string
+export interface EstadoResponse {
   execution_id: number | null
+  project_id: number
+  fase: string
+  mensaje: string
+  progreso: number
+  total: number
+  exitosas: number
+  fallidas: number
+  tiempo_transcurrido: string
+  tiempo_por_encuesta: string
+  excel: string | null
+  logs: string
 }
 
 export interface DashboardItem {
-  project: Pick<Project, 'id' | 'nombre' | 'plataforma' | 'url'>
+  project: ProjectSimple
   execution: EstadoResponse
 }
 

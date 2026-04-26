@@ -1,0 +1,204 @@
+{
+  "nombre": "EPA - Estudiante No Procrastinador v2",
+  "perfiles": [
+    {
+      "nombre": "Estudiante No Procrastinador",
+      "descripcion": "Estudiante universitario con sólidos hábitos de estudio. Distribución realista con sesgo antiprocrastinación sin verse forzado.",
+      "frecuencia": 100,
+      "tendencia_sugerida": "Antiprocrastinación realista",
+      "respuestas": {
+        "¿Acepta voluntariamente, participar de la investigación?": {
+          "tipo": "fijo",
+          "valor": "Sí"
+        },
+        "Sexo": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Hombre": 50,
+            "Mujer": 50
+          }
+        },
+        "Edad": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "17-20": 30,
+            "21-23": 40,
+            "24-26": 20,
+            "27-30": 10
+          }
+        },
+        "1. Cuando tengo que hacer una tarea, normalmente la dejo para el último minuto.": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Nunca": 69,
+            "Pocas veces": 14,
+            "A veces": 8,
+            "Casi siempre": 5,
+            "Siempre": 4
+          }
+        },
+        "2. Generalmente me preparo por adelantado para los exámenes": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Siempre": 66,
+            "Casi siempre": 18,
+            "A veces": 8,
+            "Pocas veces": 5,
+            "Nunca": 3
+          }
+        },
+        "3. Cuando me asignan lecturas, las leo la noche anterior.": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Nunca": 67,
+            "Pocas veces": 15,
+            "A veces": 9,
+            "Casi siempre": 5,
+            "Siempre": 4
+          }
+        },
+        "4.Cuando me asignan lecturas, las reviso el mismo día de la clase.": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Casi siempre": 55,
+            "A veces": 25,
+            "Siempre": 10,
+            "Pocas veces": 6,
+            "Nunca": 4
+          }
+        },
+        "5.Cuando tengo problemas para entender algo, inmediatamente trato de buscar ayuda": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Siempre": 64,
+            "Casi siempre": 20,
+            "A veces": 8,
+            "Pocas veces": 5,
+            "Nunca": 3
+          }
+        },
+        "6.Asisto regularmente a clases.": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Siempre": 68,
+            "Casi siempre": 17,
+            "A veces": 8,
+            "Pocas veces": 4,
+            "Nunca": 3
+          }
+        },
+        "7.Trato de completar el trabajo asignado lo más pronto posible": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Siempre": 63,
+            "Casi siempre": 21,
+            "A veces": 9,
+            "Pocas veces": 4,
+            "Nunca": 3
+          }
+        },
+        "8.Postergo los trabajos de los cursos que no me gustan": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Nunca": 65,
+            "Pocas veces": 18,
+            "A veces": 9,
+            "Casi siempre": 5,
+            "Siempre": 3
+          }
+        },
+        "9.Postergo las lecturas de los cursos que no me gustan.": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Nunca": 62,
+            "Pocas veces": 20,
+            "A veces": 10,
+            "Casi siempre": 5,
+            "Siempre": 3
+          }
+        },
+        "10.Constantemente intento mejorar mis hábitos de estudio.": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Siempre": 67,
+            "Casi siempre": 18,
+            "A veces": 8,
+            "Pocas veces": 4,
+            "Nunca": 3
+          }
+        },
+        "11.Invierto el tiempo necesario en estudiar aun cuando el tema sea aburrido.": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Siempe": 60,
+            "Casi siempre": 22,
+            "A veces": 10,
+            "Pocas veces": 5,
+            "Nunca": 3
+          }
+        },
+        "12. Trato de motivarme para mantener mi ritmo de estudio.": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Siempre": 65,
+            "Casi siempre": 19,
+            "A veces": 8,
+            "Pocas veces": 5,
+            "Nunca": 3
+          }
+        },
+        "13.Trato de terminar mis trabajos importantes con tiempo de sobra.": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Siempre": 59,
+            "Casi siempre": 23,
+            "A veces": 10,
+            "Pocas veces": 5,
+            "Nunca": 3
+          }
+        },
+        "14.Me tomo el tiempo de revisar mis tareas antes de entregarlas.": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Siempre": 66,
+            "Casi siempre": 18,
+            "A veces": 8,
+            "Pocas veces": 5,
+            "Nunca": 3
+          }
+        },
+        "15.Raramente dejo para mañana lo que puedo hacer hoy.": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Siempre": 61,
+            "Casi siempre": 21,
+            "A veces": 10,
+            "Pocas veces": 5,
+            "Nunca": 3
+          }
+        },
+        "16.Disfruto la mezcla de desafío con emoción de esperar hasta el último minuto para completar una tarea.": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Nunca": 68,
+            "Pocas veces": 15,
+            "A veces": 8,
+            "Casi siempre": 5,
+            "Siempre": 4
+          }
+        }
+      }
+    }
+  ],
+  "reglas_dependencia": [],
+  "tendencias_escalas": [
+    {
+      "nombre": "Antiprocrastinación realista",
+      "descripcion": "Distribución de respaldo con sesgo hacia respuestas positivas pero con variabilidad natural.",
+      "frecuencia": 100,
+      "distribuciones": {
+        "5": [62, 20, 10, 5, 3]
+      }
+    }
+  ]
+}

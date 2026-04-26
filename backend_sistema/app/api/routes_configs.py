@@ -59,13 +59,13 @@ def actualizar_config(project_id, config_id):
     data = request.json or {}
     if "perfiles" in data:
         if len(data["perfiles"]) < MIN_PERFILES or len(data["perfiles"]) > MAX_PERFILES:
-            return jsonify({"error": "Se requieren entre 3 y 4 perfiles"}), 400
+            return jsonify({"error": f"Se requieren entre {MIN_PERFILES} y {MAX_PERFILES} perfiles"}), 400
         config.perfiles = data["perfiles"]
     if "reglas_dependencia" in data:
         config.reglas_dependencia = data["reglas_dependencia"] or []
     if "tendencias_escalas" in data:
         if len(data["tendencias_escalas"]) < MIN_TENDENCIAS or len(data["tendencias_escalas"]) > MAX_TENDENCIAS:
-            return jsonify({"error": "Se requieren entre 3 y 4 tendencias"}), 400
+            return jsonify({"error": f"Se requieren entre {MIN_TENDENCIAS} y {MAX_TENDENCIAS} tendencias"}), 400
         config.tendencias_escalas = data["tendencias_escalas"]
     if "nombre" in data:
         config.nombre = data["nombre"]

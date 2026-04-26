@@ -1,0 +1,111 @@
+{
+  "nombre": "EPA - Estudiante No Procrastinador",
+  "perfiles": [
+    {
+      "nombre": "Estudiante No Procrastinador",
+      "descripcion": "Estudiante universitario con hábitos de estudio óptimos: planifica con anticipación, cumple plazos, asiste a clases y no posterga tareas ni lecturas. Representa el perfil ideal según la Escala EPA.",
+      "frecuencia": 100,
+      "tendencia_sugerida": "Puntaje óptimo EPA",
+      "respuestas": {
+        "¿Acepta voluntariamente, participar de la investigación?": {
+          "tipo": "fijo",
+          "valor": "Sí"
+        },
+        "Sexo": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Hombre": 50,
+            "Mujer": 50
+          }
+        },
+        "Edad": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "17-20": 30,
+            "21-23": 40,
+            "24-26": 20,
+            "27-30": 10
+          }
+        },
+        "1. Cuando tengo que hacer una tarea, normalmente la dejo para el último minuto.": {
+          "tipo": "fijo",
+          "valor": "Nunca"
+        },
+        "2. Generalmente me preparo por adelantado para los exámenes": {
+          "tipo": "fijo",
+          "valor": "Siempre"
+        },
+        "3. Cuando me asignan lecturas, las leo la noche anterior.": {
+          "tipo": "fijo",
+          "valor": "Nunca"
+        },
+        "4.Cuando me asignan lecturas, las reviso el mismo día de la clase.": {
+          "tipo": "aleatorio",
+          "opciones": {
+            "Casi siempre": 60,
+            "A veces": 40
+          }
+        },
+        "5.Cuando tengo problemas para entender algo, inmediatamente trato de buscar ayuda": {
+          "tipo": "fijo",
+          "valor": "Siempre"
+        },
+        "6.Asisto regularmente a clases.": {
+          "tipo": "fijo",
+          "valor": "Siempre"
+        },
+        "7.Trato de completar el trabajo asignado lo más pronto posible": {
+          "tipo": "fijo",
+          "valor": "Siempre"
+        },
+        "8.Postergo los trabajos de los cursos que no me gustan": {
+          "tipo": "fijo",
+          "valor": "Nunca"
+        },
+        "9.Postergo las lecturas de los cursos que no me gustan.": {
+          "tipo": "fijo",
+          "valor": "Nunca"
+        },
+        "10.Constantemente intento mejorar mis hábitos de estudio.": {
+          "tipo": "fijo",
+          "valor": "Siempre"
+        },
+        "11.Invierto el tiempo necesario en estudiar aun cuando el tema sea aburrido.": {
+          "tipo": "fijo",
+          "valor": "Siempe"
+        },
+        "12. Trato de motivarme para mantener mi ritmo de estudio.": {
+          "tipo": "fijo",
+          "valor": "Siempre"
+        },
+        "13.Trato de terminar mis trabajos importantes con tiempo de sobra.": {
+          "tipo": "fijo",
+          "valor": "Siempre"
+        },
+        "14.Me tomo el tiempo de revisar mis tareas antes de entregarlas.": {
+          "tipo": "fijo",
+          "valor": "Siempre"
+        },
+        "15.Raramente dejo para mañana lo que puedo hacer hoy.": {
+          "tipo": "fijo",
+          "valor": "Siempre"
+        },
+        "16.Disfruto la mezcla de desafío con emoción de esperar hasta el último minuto para completar una tarea.": {
+          "tipo": "fijo",
+          "valor": "Nunca"
+        }
+      }
+    }
+  ],
+  "reglas_dependencia": [],
+  "tendencias_escalas": [
+    {
+      "nombre": "Puntaje óptimo EPA",
+      "descripcion": "Distribución de respaldo para preguntas no cubiertas por el perfil fijo. Sesgo fuerte hacia las opciones 'Siempre' y 'Casi siempre'.",
+      "frecuencia": 100,
+      "distribuciones": {
+        "5": [80, 15, 5, 0, 0]
+      }
+    }
+  ]
+}

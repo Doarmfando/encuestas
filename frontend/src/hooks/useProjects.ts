@@ -1,15 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
-import type { Project } from '../types'
+import type { Project, ProjectSimple } from '../types'
 
 export const useProjects = () =>
-  useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('projects') })
+  useQuery({ queryKey: ['projects'], queryFn: () => api.get<ProjectSimple[]>('projects') })
 
 export const useCreateProject = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: { nombre: string; url: string; descripcion: string }) =>
-      api.post<Project>('projects', data),
+      api.post<{ id: number }>('projects', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
   })
 }
